@@ -1,0 +1,8 @@
+{
+  "name": "Realisasi Anggaran Operasi",
+  "description": "Realisasi Anggaran Operasi UPT Madiun",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
