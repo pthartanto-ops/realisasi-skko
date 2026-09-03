@@ -11,6 +11,7 @@ import { PrognosaView } from './views/PrognosaView';
 import { AlihDayaMonitoringView } from './views/AlihDayaMonitoringView';
 import { ReportsView } from './views/ReportsView';
 import { UserManagementView } from './views/UserManagementView';
+import { LoginView } from './views/LoginView';
 import { ActiveTab, ROLE_PERMISSIONS } from './types';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
@@ -20,10 +21,15 @@ function MainApp() {
 
   // If role changes or tab is not permitted, auto redirect to dashboard
   useEffect(() => {
-    if (!canAccessTab(activeTab)) {
+    if (currentUser && !canAccessTab(activeTab)) {
       setActiveTab('dashboard');
     }
-  }, [activeTab, currentUser.role, canAccessTab]);
+  }, [activeTab, currentUser, canAccessTab]);
+
+  // If not logged in, render the Login Screen
+  if (!currentUser) {
+    return <LoginView />;
+  }
 
   const renderActiveView = () => {
     // Role guard check

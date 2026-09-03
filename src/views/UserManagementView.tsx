@@ -21,7 +21,8 @@ import {
   Target,
   FileText,
   Calculator,
-  TableProperties
+  TableProperties,
+  LogOut
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AppUser, UserRole, ROLE_PERMISSIONS, ActiveTab } from '../types';
@@ -33,7 +34,8 @@ export const UserManagementView: React.FC = () => {
     addUser, 
     updateUser, 
     deleteUser, 
-    switchUser 
+    switchUser,
+    logoutUser
   } = useApp();
 
   // Search & Filter state
@@ -422,7 +424,7 @@ export const UserManagementView: React.FC = () => {
                 </tr>
               ) : (
                 filteredUsers.map((u) => {
-                  const isCurrent = currentUser.id === u.id;
+                  const isCurrent = currentUser?.id === u.id;
                   const isPasswordVisible = showPasswordMap[u.id] || false;
 
                   return (
@@ -510,10 +512,23 @@ export const UserManagementView: React.FC = () => {
                       {/* Sesi Status / Quick Switch */}
                       <td className="py-3.5 px-4">
                         {isCurrent ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            Sedang Digunakan
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Sedang Digunakan
+                            </span>
+                            <button
+                              id="btn-table-row-logout"
+                              onClick={() => {
+                                logoutUser();
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                              title="Keluar / Logout dari sesi ini"
+                            >
+                              <LogOut className="w-3 h-3 text-rose-600" />
+                              <span>Logout</span>
+                            </button>
+                          </div>
                         ) : (
                           <button
                             onClick={() => {

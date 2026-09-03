@@ -3,7 +3,6 @@ import {
   Building2, 
   Calendar, 
   Download, 
-  TrendingUp, 
   LayoutDashboard, 
   FileEdit, 
   Receipt,
@@ -18,10 +17,11 @@ import {
   ShieldCheck,
   UserCheck,
   ChevronDown,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { MONTH_NAMES, formatRupiahShort, formatPercent } from '../utils/formatters';
+import { MONTH_NAMES } from '../utils/formatters';
 import { exportFullReportToExcel } from '../utils/excelExporter';
 import { ActiveTab, ROLE_PERMISSIONS } from '../types';
 import { SupabaseSyncModal } from './SupabaseSyncModal';
@@ -39,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     alihDayaContracts,
     selectedYear, 
     selectedMonth, 
+    availableYears,
     setSelectedYear, 
     setSelectedMonth, 
     isSupabaseEnabled,
@@ -46,11 +47,13 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     users,
     currentUser,
     switchUser,
+    logoutUser,
     canAccessTab
   } = useApp();
 
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user dropdown on outside click
@@ -113,6 +116,9 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   // Filter based on currently logged in user's role permissions
   const visibleNavItems = allNavItems.filter(item => canAccessTab(item.id));
 
+  // If no active user, header does not render
+  if (!currentUser) return null;
+
   const roleConfig = ROLE_PERMISSIONS[currentUser.role] || ROLE_PERMISSIONS.user;
 
   return (
@@ -147,9 +153,9 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
                   className="bg-slate-900 text-white font-semibold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-blue-500 text-xs cursor-pointer"
                 >
-                  <option value={2026}>2026</option>
-                  <option value={2025}>2025</option>
-                  <option value={2024}>2024</option>
+                  {(availableYears || [2024, 2025, 2026, 2027]).map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
                 </select>
               </div>
 
@@ -356,22 +362,49 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                       </div>
                     </div>
 
-                    {/* Shortcut to User Management */}
-                    <div className="pt-2 px-3 border-t border-slate-100">
+                    {/* Shortcuts & Logout */}
+                    <div className="pt-2 px-3 border-t border-slate-100 space-y-1.5">
+                      {canAccessTab('user_management') && (
+                        <button
+                          onClick={() => {
+                            setActiveTab('user_management');
+                            setIsUserMenuOpen(false);
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <Users className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Kelola Profil &amp; Role Pengguna</span>
+                        </button>
+                      )}
+
                       <button
+                        id="btn-logout-user-menu"
                         onClick={() => {
-                          setActiveTab('user_management');
                           setIsUserMenuOpen(false);
+                          setIsLogoutModalOpen(true);
                         }}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                       >
-                        <Users className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Kelola Profil &amp; Role Pengguna</span>
+                        <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Keluar / Logout</span>
                       </button>
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* Quick Logout Button */}
+              <button
+                id="btn-header-quick-logout"
+                onClick={() => {
+                  setIsLogoutModalOpen(true);
+                }}
+                title={`Keluar / Logout dari ${currentUser.nama}`}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden md:inline">Logout</span>
+              </button>
             </div>
           </div>
         </div>
@@ -414,6 +447,45 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
       />
+
+      {/* In-App Logout Confirmation Modal (Never blocked by iframe sandbox) */}
+      {isLogoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <LogOut className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              Konfirmasi Keluar Sistem
+            </h3>
+            <p className="text-xs text-slate-600 mb-6 leading-relaxed">
+              Apakah Anda yakin ingin keluar dari akun <strong className="text-slate-900">{currentUser.nama}</strong> ({currentUser.jabatan})? Sesi Anda akan diakhiri dan dialihkan kembali ke layar login NIP.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                id="btn-cancel-logout"
+                onClick={() => setIsLogoutModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-logout-action"
+                onClick={() => {
+                  setIsLogoutModalOpen(false);
+                  logoutUser();
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Ya, Keluar Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

@@ -14,6 +14,7 @@ import {
   ROLE_PERMISSIONS
 } from '../types';
 import { DEFAULT_BUDGET_ITEMS, DEFAULT_INDICATORS, DEFAULT_ADDITIONAL_TRANSACTIONS, DEFAULT_ALIH_DAYA_CONTRACTS } from '../data/defaultBudgetData';
+import { generateDefaultYearDataset, YearDataset } from '../data/yearlyBudgetData';
 import { DEFAULT_USERS } from '../data/defaultUsers';
 import { recalculateBudgetSubtotals, getChildAccountsForHeader } from '../utils/budgetCalculations';
 import { isSupabaseConfigured } from '../services/supabaseClient';
@@ -27,17 +28,20 @@ interface AppContextType {
   importLogs: ImportLog[];
   selectedYear: number;
   selectedMonth: number; // 0 for Jan, 7 for Aug, 11 for Dec
+  availableYears: number[];
   setSelectedYear: (year: number) => void;
   setSelectedMonth: (month: number) => void;
+  copyDataFromYear: (fromYear: number, targetYear?: number, options?: { copyBudget?: boolean; copyContracts?: boolean }) => { success: boolean; message: string };
 
   // User & Role Management
   users: AppUser[];
-  currentUser: AppUser;
+  currentUser: AppUser | null;
   addUser: (user: Omit<AppUser, 'id' | 'createdAt'>) => { success: boolean; message?: string };
   updateUser: (id: string, updated: Partial<AppUser>) => { success: boolean; message?: string };
   deleteUser: (id: string) => { success: boolean; message?: string };
   switchUser: (userId: string) => void;
-  loginUser: (nipOrNama: string, password: string) => { success: boolean; message?: string };
+  loginUser: (nip: string, password: string) => { success: boolean; message?: string };
+  logoutUser: () => void;
   canAccessTab: (tab: ActiveTab) => boolean;
   
   // Supabase sync states & actions
@@ -100,43 +104,187 @@ const STORAGE_KEY_ALIH_DAYA = 'madiun_anggaran_alih_daya_v1';
 const STORAGE_KEY_LOGS = 'madiun_anggaran_logs_v7';
 const STORAGE_KEY_USERS = 'madiun_anggaran_users_v1';
 const STORAGE_KEY_CURRENT_USER = 'madiun_anggaran_current_user_v1';
+const STORAGE_KEY_SELECTED_YEAR = 'madiun_anggaran_selected_year_v1';
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_BUDGET) || 
-                  localStorage.getItem('madiun_anggaran_items_v6') ||
-                  localStorage.getItem('madiun_anggaran_items_v5');
-    if (saved) {
-      try {
-        let parsed = JSON.parse(saved);
-        // Migrate 'Sewa Non AHG' to 'Beban Sewa'
-        parsed = parsed.map((item: any) => {
-          let posType = item.posType;
-          let pos = item.pos;
-          if (posType === 'Sewa Non AHG') {
-            posType = 'Beban Sewa';
-            if (pos === 'Beban Sewa Non AHG' || pos === 'Beban Sewa AHG') {
-              pos = 'Beban Sewa';
-            }
-          }
-          const rawReal = item.realizationMonthly || Array(12).fill(0).map((_, m) => (item.realizationTunai?.[m] || 0) + (item.realizationNonTunai?.[m] || 0));
-          return {
-            ...item,
-            posType,
-            pos,
-            realizationMonthly: rawReal
-          };
-        });
+export const AVAILABLE_YEARS = [2024, 2025, 2026, 2027];
 
+const getYearStorageKey = (baseKey: string, year: number) => `${baseKey}_${year}`;
+
+// Normalizer untuk Item Anggaran
+const normalizeBudgetItem = (item: any): BudgetItem => {
+  let posType = item.posType;
+  let pos = item.pos;
+  if (posType === 'Sewa Non AHG') {
+    posType = 'Beban Sewa';
+    if (pos === 'Beban Sewa Non AHG' || pos === 'Beban Sewa AHG') {
+      pos = 'Beban Sewa';
+    }
+  }
+  const rawReal = Array.isArray(item.realizationMonthly)
+    ? item.realizationMonthly
+    : Array(12).fill(0).map((_, m) => (item.realizationTunai?.[m] || 0) + (item.realizationNonTunai?.[m] || 0));
+
+  const rawBudget = Array.isArray(item.budgetMonthly)
+    ? item.budgetMonthly
+    : Array(12).fill(0);
+
+  return {
+    ...item,
+    posType,
+    pos,
+    budgetAnnual: item.budgetAnnual || 0,
+    budgetMonthly: rawBudget,
+    realizationMonthly: rawReal
+  };
+};
+
+// Normalizer untuk Indikator SKKO
+const normalizeIndicator = (ind: any): IndicatorTarget => {
+  if (ind.posType === 'Sewa Non AHG' || ind.id === 'ind_sewa_non_ahg') {
+    return {
+      ...ind,
+      id: 'ind_sewa',
+      code: 'BEBAN_SEWA',
+      name: 'Realisasi Beban Sewa',
+      pos: 'Beban Sewa',
+      posType: 'Beban Sewa',
+      description: 'Realisasi sewa kendaraan, laptop, driver, AC, lahan, serta pembangkit & non pembangkit anak perusahaan'
+    };
+  }
+  return ind;
+};
+
+// Normalizer untuk Transaksi Komitmen Tambahan
+const normalizeTransaction = (tx: any): AdditionalTransaction => {
+  let posType = tx.posType;
+  let posName = tx.posName;
+  if (posType === 'Sewa Non AHG') {
+    posType = 'Beban Sewa';
+    posName = 'Beban Sewa';
+  }
+  let glAccount = tx.glAccount;
+  let glAccountName = tx.glAccountName;
+  if (!glAccount) {
+    const def = DEFAULT_ADDITIONAL_TRANSACTIONS.find(d => d.id === tx.id || d.name.toLowerCase() === tx.name.toLowerCase());
+    if (def) {
+      glAccount = def.glAccount;
+      glAccountName = def.glAccountName;
+    } else if (posType === 'Pos 53') {
+      glAccount = '6106200700';
+      glAccountName = 'Beban jasa borong Gardu Induk';
+    } else if (posType === 'Pos 54') {
+      glAccount = '6107201400';
+      glAccountName = 'Alat dan Keperluan Kantor';
+    } else if (posType === 'Beban Sewa') {
+      glAccount = '6101310001';
+      glAccountName = 'Beban Sewa Non AHG';
+    } else if (posType === 'Pos 52') {
+      glAccount = '6105100110';
+      glAccountName = 'Pay For Person (P1)';
+    } else if (posType === 'Pos 72') {
+      glAccount = '6108100100';
+      glAccountName = 'Beban Pensiun & THT';
+    }
+  }
+  return {
+    ...tx,
+    posType,
+    posName,
+    glAccount: glAccount || '6106200700',
+    glAccountName: glAccountName || 'Beban Operasional'
+  };
+};
+
+// Normalizer untuk Kontrak Alih Daya
+const normalizeContract = (c: AlihDayaContract): AlihDayaContract => {
+  const pos = (c.posAnggaran || c.posType || 'Pos 53') as PosType;
+  const tahun = c.tahunAnggaran || c.tahun || 2026;
+  const glDef = c.glAccountDefault || '6106201700';
+  const glNameDef = c.glAccountNameDefault || c.glAccountDefaultName || '';
+
+  return {
+    ...c,
+    id: c.id || `kontrak_ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    namaKontrak: c.namaKontrak || '',
+    nomerKontrak: c.nomerKontrak || '',
+    vendor: c.vendor || '',
+    posAnggaran: pos,
+    posType: pos,
+    glAccountDefault: glDef,
+    glAccountNameDefault: glNameDef,
+    glAccountDefaultName: glNameDef,
+    tahunAnggaran: tahun,
+    tahun: tahun,
+    keterangan: c.keterangan || '',
+    statusKontrak: c.statusKontrak || 'Aktif',
+    termins: (c.termins || []).map((t, idx) => {
+      const terminLabel = t.terminTagihan || t.termin || `Termin ${idx + 1}`;
+      const nominal = t.nominalTagihan ?? t.amount ?? 0;
+      const docNum = t.documentNumber || '';
+      const statusBeban: StatusBeban = (docNum.trim() !== '' || t.statusBeban === 'Tercatat') ? 'Tercatat' : 'Belum Tercatat';
+      const tgl = t.tanggalJatuhTempo || t.tglTagihan || '';
+
+      return {
+        ...t,
+        id: t.id || `t_ad_${idx}_${Date.now()}`,
+        terminTagihan: terminLabel,
+        termin: terminLabel,
+        bulanIndex: t.bulanIndex !== undefined ? t.bulanIndex : undefined,
+        nominalTagihan: nominal,
+        amount: nominal,
+        glAccount: t.glAccount || glDef,
+        glAccountName: t.glAccountName || glNameDef,
+        posType: t.posType || pos,
+        documentNumber: docNum,
+        statusBeban,
+        tanggalJatuhTempo: tgl,
+        tglTagihan: tgl,
+        notes: t.notes || ''
+      };
+    })
+  };
+};
+
+// Helper untuk membaca dataset tahun tertentu dari storage atau default generator
+const loadYearDataset = (year: number): YearDataset => {
+  const budgetKey = getYearStorageKey(STORAGE_KEY_BUDGET, year);
+  const indKey = getYearStorageKey(STORAGE_KEY_INDICATORS, year);
+  const txKey = getYearStorageKey(STORAGE_KEY_TRANSACTIONS, year);
+  const adKey = getYearStorageKey(STORAGE_KEY_ALIH_DAYA, year);
+  const logsKey = getYearStorageKey(STORAGE_KEY_LOGS, year);
+
+  const defaultDataset = generateDefaultYearDataset(year);
+
+  // Backward compatibility: untuk tahun 2026, fallback ke legacy keys jika tahunan belum dibuat
+  const savedBudget = localStorage.getItem(budgetKey) || 
+    (year === 2026 ? (localStorage.getItem(STORAGE_KEY_BUDGET) || localStorage.getItem('madiun_anggaran_items_v6') || localStorage.getItem('madiun_anggaran_items_v5')) : null);
+  const savedInd = localStorage.getItem(indKey) || 
+    (year === 2026 ? (localStorage.getItem(STORAGE_KEY_INDICATORS) || localStorage.getItem('madiun_anggaran_indicators_v6')) : null);
+  const savedTx = localStorage.getItem(txKey) || 
+    (year === 2026 ? (localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || localStorage.getItem('madiun_anggaran_transactions_v6')) : null);
+  const savedAD = localStorage.getItem(adKey) || 
+    (year === 2026 ? localStorage.getItem(STORAGE_KEY_ALIH_DAYA) : null);
+  const savedLogs = localStorage.getItem(logsKey) || 
+    (year === 2026 ? (localStorage.getItem(STORAGE_KEY_LOGS) || localStorage.getItem('madiun_anggaran_logs_v6')) : null);
+
+  let budgetItems: BudgetItem[] = defaultDataset.budgetItems;
+  let indicators: IndicatorTarget[] = defaultDataset.indicators;
+  let additionalTransactions: AdditionalTransaction[] = defaultDataset.additionalTransactions;
+  let alihDayaContracts: AlihDayaContract[] = defaultDataset.alihDayaContracts;
+  let importLogs: ImportLog[] = defaultDataset.importLogs;
+
+  if (savedBudget) {
+    try {
+      let parsed = JSON.parse(savedBudget);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed = parsed.map(normalizeBudgetItem);
         // Ensure Beban Sewa sub accounts exist
         const hasSewaNonAhg = parsed.some((it: any) => it.code === '6101310001');
         const hasSewaAnakPrshn = parsed.some((it: any) => it.code === '6101310002');
         const hasSewaHeader = parsed.some((it: any) => it.posType === 'Beban Sewa' && it.isGroupHeader);
 
         if (!hasSewaNonAhg || !hasSewaAnakPrshn || !hasSewaHeader) {
-          // Remove legacy CODE_74..CODE_77 if present
           parsed = parsed.filter((it: any) => !['CODE_75', 'CODE_76', 'CODE_77'].includes(it.code));
-          
           let header = parsed.find((it: any) => it.code === 'CODE_74');
           if (header) {
             header.name = 'Beban Sewa';
@@ -147,7 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             header.isGroupHeader = true;
           } else {
             header = {
-              id: "item_74",
+              id: `item_74_${year}`,
               code: "CODE_74",
               name: "Beban Sewa",
               pos: "Beban Sewa",
@@ -167,7 +315,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           if (!hasSewaNonAhg) {
             const sewa1: BudgetItem = {
-              id: "item_sewa_non_ahg",
+              id: `item_sewa_non_ahg_${year}`,
               code: "6101310001",
               name: "Beban Sewa Non AHG",
               pos: "Beban Sewa",
@@ -187,7 +335,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           if (!hasSewaAnakPrshn) {
             const sewa2: BudgetItem = {
-              id: "item_sewa_anak_prshn",
+              id: `item_sewa_anak_prshn_${year}`,
               code: "6101310002",
               name: "Beban Sewa Pembangkit & Non Pembangkit Anak Prshn",
               pos: "Beban Sewa",
@@ -205,174 +353,155 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             else parsed.push(sewa2);
           }
         }
-
-        return recalculateBudgetSubtotals(parsed);
-      } catch (e) {
-        console.error('Failed to parse saved budget data', e);
+        budgetItems = recalculateBudgetSubtotals(parsed);
       }
+    } catch (e) {
+      console.error(`Gagal memuat anggaran tahun ${year}`, e);
     }
-    return recalculateBudgetSubtotals(DEFAULT_BUDGET_ITEMS);
-  });
+  }
 
-  const [indicators, setIndicators] = useState<IndicatorTarget[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_INDICATORS) || localStorage.getItem('madiun_anggaran_indicators_v6');
-    if (saved) {
-      try {
-        let parsed: IndicatorTarget[] = JSON.parse(saved);
-        parsed = parsed.map(ind => {
-          if (ind.posType === 'Sewa Non AHG' || ind.id === 'ind_sewa_non_ahg') {
-            return {
-              ...ind,
-              id: 'ind_sewa',
-              code: 'BEBAN_SEWA',
-              name: 'Realisasi Beban Sewa',
-              pos: 'Beban Sewa',
-              posType: 'Beban Sewa',
-              description: 'Realisasi sewa kendaraan, laptop, driver, AC, lahan, serta pembangkit & non pembangkit anak perusahaan'
-            };
-          }
-          return ind;
-        });
-        return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved indicators', e);
+  if (savedInd) {
+    try {
+      const parsed = JSON.parse(savedInd);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        indicators = parsed.map(normalizeIndicator);
       }
+    } catch (e) {
+      console.error(`Gagal memuat indikator tahun ${year}`, e);
     }
-    return DEFAULT_INDICATORS;
-  });
+  }
 
-  const [additionalTransactions, setAdditionalTransactions] = useState<AdditionalTransaction[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || localStorage.getItem('madiun_anggaran_transactions_v6');
-    if (saved) {
-      try {
-        let parsed: AdditionalTransaction[] = JSON.parse(saved);
-        parsed = parsed.map(tx => {
-          let posType = tx.posType;
-          let posName = tx.posName;
-          if (posType === 'Sewa Non AHG') {
-            posType = 'Beban Sewa';
-            posName = 'Beban Sewa';
-          }
-          // If glAccount is missing, look up in DEFAULT_ADDITIONAL_TRANSACTIONS or fallback
-          let glAccount = tx.glAccount;
-          let glAccountName = tx.glAccountName;
-          if (!glAccount) {
-            const def = DEFAULT_ADDITIONAL_TRANSACTIONS.find(d => d.id === tx.id || d.name.toLowerCase() === tx.name.toLowerCase());
-            if (def) {
-              glAccount = def.glAccount;
-              glAccountName = def.glAccountName;
-            } else if (posType === 'Pos 53') {
-              glAccount = '6106200700';
-              glAccountName = 'Beban jasa borong Gardu Induk';
-            } else if (posType === 'Pos 54') {
-              glAccount = '6107201400';
-              glAccountName = 'Alat dan Keperluan Kantor';
-            } else if (posType === 'Beban Sewa') {
-              glAccount = '6101310001';
-              glAccountName = 'Beban Sewa Non AHG';
-            } else if (posType === 'Pos 52') {
-              glAccount = '6105100110';
-              glAccountName = 'Pay For Person (P1)';
-            } else if (posType === 'Pos 72') {
-              glAccount = '6108100100';
-              glAccountName = 'Beban Pensiun & THT';
-            }
-          }
-          return {
-            ...tx,
-            posType,
-            posName,
-            glAccount,
-            glAccountName
-          };
-        });
-        return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved transactions', e);
+  if (savedTx) {
+    try {
+      const parsed = JSON.parse(savedTx);
+      if (Array.isArray(parsed)) {
+        additionalTransactions = parsed.map(normalizeTransaction);
       }
+    } catch (e) {
+      console.error(`Gagal memuat transaksi tahun ${year}`, e);
     }
-    return DEFAULT_ADDITIONAL_TRANSACTIONS;
-  });
+  }
 
-  const [importLogs, setImportLogs] = useState<ImportLog[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_LOGS) || localStorage.getItem('madiun_anggaran_logs_v6');
-    if (saved) {
-      try {
-        const parsed: ImportLog[] = JSON.parse(saved);
-        return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved logs', e);
+  if (savedAD) {
+    try {
+      const parsed = JSON.parse(savedAD);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        alihDayaContracts = parsed.map(normalizeContract);
       }
+    } catch (e) {
+      console.error(`Gagal memuat alih daya tahun ${year}`, e);
     }
-    return [];
-  });
+  }
 
-  const normalizeContract = (c: AlihDayaContract): AlihDayaContract => {
-    const pos = (c.posAnggaran || c.posType || 'Pos 53') as PosType;
-    const tahun = c.tahunAnggaran || c.tahun || 2026;
-    const glDef = c.glAccountDefault || '6106201700';
-    const glNameDef = c.glAccountNameDefault || c.glAccountDefaultName || '';
+  if (savedLogs) {
+    try {
+      const parsed = JSON.parse(savedLogs);
+      if (Array.isArray(parsed)) {
+        importLogs = parsed;
+      }
+    } catch (e) {
+      console.error(`Gagal memuat log impor tahun ${year}`, e);
+    }
+  }
 
-    return {
-      ...c,
-      id: c.id || `kontrak_ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      namaKontrak: c.namaKontrak || '',
-      nomerKontrak: c.nomerKontrak || '',
-      vendor: c.vendor || '',
-      posAnggaran: pos,
-      posType: pos,
-      glAccountDefault: glDef,
-      glAccountNameDefault: glNameDef,
-      glAccountDefaultName: glNameDef,
-      tahunAnggaran: tahun,
-      tahun: tahun,
-      keterangan: c.keterangan || '',
-      statusKontrak: c.statusKontrak || 'Aktif',
-      termins: (c.termins || []).map((t, idx) => {
-        const terminLabel = t.terminTagihan || t.termin || `Termin ${idx + 1}`;
-        const nominal = t.nominalTagihan ?? t.amount ?? 0;
-        const docNum = t.documentNumber || '';
-        const statusBeban: StatusBeban = (docNum.trim() !== '' || t.statusBeban === 'Tercatat') ? 'Tercatat' : 'Belum Tercatat';
-        const tgl = t.tanggalJatuhTempo || t.tglTagihan || '';
-
-        return {
-          ...t,
-          id: t.id || `t_ad_${idx}_${Date.now()}`,
-          terminTagihan: terminLabel,
-          termin: terminLabel,
-          bulanIndex: t.bulanIndex !== undefined ? t.bulanIndex : undefined,
-          nominalTagihan: nominal,
-          amount: nominal,
-          glAccount: t.glAccount || glDef,
-          glAccountName: t.glAccountName || glNameDef,
-          posType: t.posType || pos,
-          documentNumber: docNum,
-          statusBeban,
-          tanggalJatuhTempo: tgl,
-          tglTagihan: tgl,
-          notes: t.notes || ''
-        };
-      })
-    };
+  return {
+    budgetItems,
+    indicators,
+    additionalTransactions,
+    alihDayaContracts,
+    importLogs
   };
+};
 
-  const [alihDayaContracts, setAlihDayaContracts] = useState<AlihDayaContract[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_ALIH_DAYA);
-    if (saved) {
-      try {
-        const parsed: AlihDayaContract[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(normalizeContract);
-        }
-      } catch (e) {
-        console.error('Failed to parse saved Alih Daya contracts', e);
-      }
+// Helper untuk menyimpan dataset tahun tertentu ke storage
+const saveYearDataset = (year: number, data: YearDataset) => {
+  try {
+    const budgetKey = getYearStorageKey(STORAGE_KEY_BUDGET, year);
+    const indKey = getYearStorageKey(STORAGE_KEY_INDICATORS, year);
+    const txKey = getYearStorageKey(STORAGE_KEY_TRANSACTIONS, year);
+    const adKey = getYearStorageKey(STORAGE_KEY_ALIH_DAYA, year);
+    const logsKey = getYearStorageKey(STORAGE_KEY_LOGS, year);
+
+    localStorage.setItem(budgetKey, JSON.stringify(data.budgetItems));
+    localStorage.setItem(indKey, JSON.stringify(data.indicators));
+    localStorage.setItem(txKey, JSON.stringify(data.additionalTransactions));
+    localStorage.setItem(adKey, JSON.stringify(data.alihDayaContracts));
+    localStorage.setItem(logsKey, JSON.stringify(data.importLogs));
+
+    // Sinkronisasi juga ke legacy key tanpa akhiran tahun untuk tahun 2026
+    if (year === 2026) {
+      localStorage.setItem(STORAGE_KEY_BUDGET, JSON.stringify(data.budgetItems));
+      localStorage.setItem(STORAGE_KEY_INDICATORS, JSON.stringify(data.indicators));
+      localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(data.additionalTransactions));
+      localStorage.setItem(STORAGE_KEY_ALIH_DAYA, JSON.stringify(data.alihDayaContracts));
+      localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(data.importLogs));
     }
-    return DEFAULT_ALIH_DAYA_CONTRACTS.map(normalizeContract);
-  });
+  } catch (e) {
+    console.error(`Gagal menyimpan dataset tahun ${year}`, e);
+  }
+};
 
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonth, setSelectedMonth] = useState<number>(7); // Default to August (0-indexed = 7)
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Ambil tahun yang disimpan sebelumnya atau default ke 2026
+  const initialYear = (() => {
+    const saved = localStorage.getItem(STORAGE_KEY_SELECTED_YEAR);
+    if (saved && !isNaN(Number(saved))) {
+      const n = Number(saved);
+      if (AVAILABLE_YEARS.includes(n)) return n;
+    }
+    return 2026;
+  })();
+
+  const [selectedYear, setSelectedYearState] = useState<number>(initialYear);
+  const activeYearRef = useRef<number>(initialYear);
+
+  // Inisialisasi dataset tahun awal
+  const [initialData] = useState<YearDataset>(() => loadYearDataset(initialYear));
+
+  const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(initialData.budgetItems);
+  const [indicators, setIndicators] = useState<IndicatorTarget[]>(initialData.indicators);
+  const [additionalTransactions, setAdditionalTransactions] = useState<AdditionalTransaction[]>(initialData.additionalTransactions);
+  const [alihDayaContracts, setAlihDayaContracts] = useState<AlihDayaContract[]>(initialData.alihDayaContracts);
+  const [importLogs, setImportLogs] = useState<ImportLog[]>(initialData.importLogs);
+  const [selectedMonth, setSelectedMonth] = useState<number>(initialYear < 2026 ? 11 : 7);
+
+  // Handler pergantian tahun anggaran dengan persistensi otomatis per tahun
+  const setSelectedYear = useCallback((targetYear: number) => {
+    if (targetYear === activeYearRef.current) return;
+
+    const currentYear = activeYearRef.current;
+
+    // 1. Simpan segera data tahun yang sedang aktif ke storage tahunnya
+    saveYearDataset(currentYear, {
+      budgetItems,
+      indicators,
+      additionalTransactions,
+      alihDayaContracts,
+      importLogs
+    });
+
+    // 2. Muat dataset untuk tahun yang baru dipilih
+    const targetDataset = loadYearDataset(targetYear);
+
+    // 3. Update ref, state & local storage key
+    activeYearRef.current = targetYear;
+    setSelectedYearState(targetYear);
+    localStorage.setItem(STORAGE_KEY_SELECTED_YEAR, String(targetYear));
+
+    // 4. Update data state di aplikasi
+    setBudgetItems(targetDataset.budgetItems);
+    setIndicators(targetDataset.indicators);
+    setAdditionalTransactions(targetDataset.additionalTransactions);
+    setAlihDayaContracts(targetDataset.alihDayaContracts);
+    setImportLogs(targetDataset.importLogs);
+
+    // 5. Sesuaikan cut-off bulan: tahun lalu default ke bulan 11 (Desember / Tutup Buku), tahun 2026 ke 7 (Agustus)
+    if (targetYear < 2026) {
+      setSelectedMonth(11);
+    } else if (targetYear === 2026) {
+      setSelectedMonth(7);
+    }
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs]);
 
   // Users & Current Active User
   const [users, setUsers] = useState<AppUser[]>(() => {
@@ -390,19 +519,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return DEFAULT_USERS;
   });
 
-  const [currentUser, setCurrentUser] = useState<AppUser>(() => {
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.id && parsed.role) {
+        if (parsed && parsed.id && parsed.nip && parsed.role) {
           return parsed;
         }
       } catch (e) {
         console.error('Failed to parse current user', e);
       }
     }
-    return DEFAULT_USERS[0];
+    return null;
   });
 
   // Supabase sync states
@@ -487,33 +616,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [loadFromSupabase]);
 
-  // Save changes to localStorage
+  // Auto-save perubahan ke localStorage untuk tahun anggaran yang sedang aktif
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_BUDGET, JSON.stringify(budgetItems));
-  }, [budgetItems]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_INDICATORS, JSON.stringify(indicators));
-  }, [indicators]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(additionalTransactions));
-  }, [additionalTransactions]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ALIH_DAYA, JSON.stringify(alihDayaContracts));
-  }, [alihDayaContracts]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(importLogs));
-  }, [importLogs]);
+    if (activeYearRef.current === selectedYear) {
+      saveYearDataset(selectedYear, {
+        budgetItems,
+        indicators,
+        additionalTransactions,
+        alihDayaContracts,
+        importLogs
+      });
+    }
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, selectedYear]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+    }
   }, [currentUser]);
 
   // Debounced auto-save to Supabase when data changes
@@ -1244,23 +1369,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetToDefault = () => {
-    localStorage.removeItem(STORAGE_KEY_BUDGET);
-    localStorage.removeItem(STORAGE_KEY_INDICATORS);
-    localStorage.removeItem(STORAGE_KEY_TRANSACTIONS);
-    localStorage.removeItem(STORAGE_KEY_ALIH_DAYA);
-    localStorage.removeItem(STORAGE_KEY_LOGS);
-    setBudgetItems(recalculateBudgetSubtotals(DEFAULT_BUDGET_ITEMS));
-    setIndicators(DEFAULT_INDICATORS);
-    setAdditionalTransactions(DEFAULT_ADDITIONAL_TRANSACTIONS);
-    setAlihDayaContracts(DEFAULT_ALIH_DAYA_CONTRACTS);
-    setSelectedMonth(7);
+    const defaultData = generateDefaultYearDataset(selectedYear);
+    setBudgetItems(defaultData.budgetItems);
+    setIndicators(defaultData.indicators);
+    setAdditionalTransactions(defaultData.additionalTransactions);
+    setAlihDayaContracts(defaultData.alihDayaContracts);
+    setImportLogs(defaultData.importLogs);
+    saveYearDataset(selectedYear, defaultData);
+    if (selectedYear < 2026) {
+      setSelectedMonth(11);
+    } else {
+      setSelectedMonth(7);
+    }
   };
 
+  const copyDataFromYear = useCallback((fromYear: number, targetYear: number = selectedYear, options?: { copyBudget?: boolean; copyContracts?: boolean }) => {
+    const fromData = loadYearDataset(fromYear);
+    const copyBudget = options?.copyBudget ?? true;
+    const copyContracts = options?.copyContracts ?? false;
+
+    let newBudgetItems = budgetItems;
+    let newContracts = alihDayaContracts;
+
+    if (copyBudget) {
+      newBudgetItems = recalculateBudgetSubtotals(fromData.budgetItems.map(item => ({
+        ...item,
+        realizationMonthly: targetYear > fromYear ? Array(12).fill(0) : item.realizationMonthly
+      })));
+      setBudgetItems(newBudgetItems);
+    }
+
+    if (copyContracts) {
+      newContracts = fromData.alihDayaContracts.map(contract => ({
+        ...contract,
+        id: `kontrak_ad_${contract.id}_${targetYear}`,
+        tahun: targetYear,
+        tahunAnggaran: targetYear,
+        termins: contract.termins.map(t => ({
+          ...t,
+          id: `t_${t.id}_${targetYear}`,
+          documentNumber: targetYear > fromYear ? '' : t.documentNumber,
+          statusBeban: (targetYear > fromYear ? 'Belum Tercatat' : t.statusBeban) as StatusBeban
+        }))
+      }));
+      setAlihDayaContracts(newContracts);
+    }
+
+    saveYearDataset(targetYear, {
+      budgetItems: newBudgetItems,
+      indicators,
+      additionalTransactions,
+      alihDayaContracts: newContracts,
+      importLogs
+    });
+
+    return { 
+      success: true, 
+      message: `Berhasil menyalin data dari tahun ${fromYear} ke tahun ${targetYear}.` 
+    };
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, selectedYear]);
+
   const canAccessTab = useCallback((tab: ActiveTab): boolean => {
+    if (!currentUser) return false;
     const roleConfig = ROLE_PERMISSIONS[currentUser.role];
     if (!roleConfig) return false;
     return roleConfig.allowedTabs.includes(tab);
-  }, [currentUser.role]);
+  }, [currentUser]);
 
   const addUser = useCallback((userData: Omit<AppUser, 'id' | 'createdAt'>): { success: boolean; message?: string } => {
     const trimmedNip = userData.nip.trim();
@@ -1307,7 +1481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           nip: updated.nip ? updated.nip.trim() : u.nip,
           jabatan: updated.jabatan !== undefined ? updated.jabatan.trim() : u.jabatan,
         };
-        if (id === currentUser.id) {
+        if (currentUser && id === currentUser.id) {
           setCurrentUser(updatedUser);
         }
         return updatedUser;
@@ -1316,10 +1490,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     return { success: true };
-  }, [users, currentUser.id]);
+  }, [users, currentUser]);
 
   const deleteUser = useCallback((id: string): { success: boolean; message?: string } => {
-    if (id === currentUser.id) {
+    if (currentUser && id === currentUser.id) {
       return { success: false, message: 'Tidak dapat menghapus akun yang sedang aktif digunakan.' };
     }
 
@@ -1337,7 +1511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setUsers(prev => prev.filter(u => u.id !== id));
     return { success: true };
-  }, [users, currentUser.id]);
+  }, [users, currentUser]);
 
   const switchUser = useCallback((userId: string) => {
     const target = users.find(u => u.id === userId);
@@ -1346,20 +1520,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [users]);
 
-  const loginUser = useCallback((nipOrNama: string, password: string): { success: boolean; message?: string } => {
-    const query = nipOrNama.trim().toLowerCase();
+  const loginUser = useCallback((nip: string, password: string): { success: boolean; message?: string } => {
+    const trimmedNip = nip.trim();
+    if (!trimmedNip) {
+      return { success: false, message: 'Nomor Induk Pegawai (NIP) wajib diisi.' };
+    }
+    if (!password) {
+      return { success: false, message: 'Password wajib diisi.' };
+    }
+
     const matched = users.find(u => 
-      (u.nip.toLowerCase() === query || u.nama.toLowerCase() === query) &&
-      u.password === password
+      u.nip.trim() === trimmedNip && u.password === password
     );
 
     if (matched) {
       setCurrentUser(matched);
+      localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(matched));
       return { success: true };
     }
 
-    return { success: false, message: 'NIP / Nama atau Password tidak sesuai.' };
+    return { success: false, message: 'NIP atau Password yang Anda masukkan tidak sesuai.' };
   }, [users]);
+
+  const logoutUser = useCallback(() => {
+    setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+  }, []);
 
   const exportDataJSON = () => {
     const data = {
@@ -1390,8 +1576,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         importLogs,
         selectedYear,
         selectedMonth,
+        availableYears: AVAILABLE_YEARS,
         setSelectedYear,
         setSelectedMonth,
+        copyDataFromYear,
         users,
         currentUser,
         addUser,
@@ -1399,6 +1587,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteUser,
         switchUser,
         loginUser,
+        logoutUser,
         canAccessTab,
         isSupabaseEnabled,
         supabaseSyncStatus,
