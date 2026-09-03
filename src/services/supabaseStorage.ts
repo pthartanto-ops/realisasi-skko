@@ -1,5 +1,5 @@
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
-import { BudgetItem, IndicatorTarget, AdditionalTransaction, AlihDayaContract, ImportLog } from '../types';
+import { BudgetItem, IndicatorTarget, AdditionalTransaction, AlihDayaContract, ImportLog, AppUser } from '../types';
 
 export interface AppDataPayload {
   budgetItems: BudgetItem[];
@@ -9,6 +9,7 @@ export interface AppDataPayload {
   importLogs: ImportLog[];
   selectedYear?: number;
   selectedMonth?: number;
+  users?: AppUser[];
 }
 
 const APP_STATE_ID = 'main_madiun_anggaran_state';

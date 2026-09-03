@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AppProvider } from './context/AppContext';
+import React, { useState, useEffect } from 'react';
+import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { DashboardView } from './views/DashboardView';
 import { BudgetInputView } from './views/BudgetInputView';
@@ -10,12 +10,44 @@ import { PerformanceView } from './views/PerformanceView';
 import { PrognosaView } from './views/PrognosaView';
 import { AlihDayaMonitoringView } from './views/AlihDayaMonitoringView';
 import { ReportsView } from './views/ReportsView';
-import { ActiveTab } from './types';
+import { UserManagementView } from './views/UserManagementView';
+import { ActiveTab, ROLE_PERMISSIONS } from './types';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const { currentUser, canAccessTab } = useApp();
+
+  // If role changes or tab is not permitted, auto redirect to dashboard
+  useEffect(() => {
+    if (!canAccessTab(activeTab)) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, currentUser.role, canAccessTab]);
 
   const renderActiveView = () => {
+    // Role guard check
+    if (!canAccessTab(activeTab)) {
+      return (
+        <div className="bg-white rounded-2xl p-8 border border-rose-200 shadow-sm text-center max-w-lg mx-auto my-12">
+          <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">Akses Menu Dibatasi</h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Peran akun Anda saat ini (<strong>{ROLE_PERMISSIONS[currentUser.role]?.label}</strong>) tidak memiliki izin untuk mengakses modul ini.
+          </p>
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Kembali ke Dashboard Utama</span>
+          </button>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView onNavigateTab={setActiveTab} />;
@@ -35,6 +67,8 @@ function MainApp() {
         return <PrognosaView />;
       case 'reports':
         return <ReportsView />;
+      case 'user_management':
+        return <UserManagementView />;
       default:
         return <DashboardView onNavigateTab={setActiveTab} />;
     }

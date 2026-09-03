@@ -1,6 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { BudgetItem, IndicatorTarget, AdditionalTransaction, ImportLog, PosType, AlihDayaContract, AlihDayaTermin, StatusBeban } from '../types';
+import { 
+  BudgetItem, 
+  IndicatorTarget, 
+  AdditionalTransaction, 
+  ImportLog, 
+  PosType, 
+  AlihDayaContract, 
+  AlihDayaTermin, 
+  StatusBeban,
+  ActiveTab,
+  AppUser,
+  UserRole,
+  ROLE_PERMISSIONS
+} from '../types';
 import { DEFAULT_BUDGET_ITEMS, DEFAULT_INDICATORS, DEFAULT_ADDITIONAL_TRANSACTIONS, DEFAULT_ALIH_DAYA_CONTRACTS } from '../data/defaultBudgetData';
+import { DEFAULT_USERS } from '../data/defaultUsers';
 import { recalculateBudgetSubtotals, getChildAccountsForHeader } from '../utils/budgetCalculations';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { fetchRemoteState, saveRemoteState, AppDataPayload } from '../services/supabaseStorage';
@@ -15,6 +29,16 @@ interface AppContextType {
   selectedMonth: number; // 0 for Jan, 7 for Aug, 11 for Dec
   setSelectedYear: (year: number) => void;
   setSelectedMonth: (month: number) => void;
+
+  // User & Role Management
+  users: AppUser[];
+  currentUser: AppUser;
+  addUser: (user: Omit<AppUser, 'id' | 'createdAt'>) => { success: boolean; message?: string };
+  updateUser: (id: string, updated: Partial<AppUser>) => { success: boolean; message?: string };
+  deleteUser: (id: string) => { success: boolean; message?: string };
+  switchUser: (userId: string) => void;
+  loginUser: (nipOrNama: string, password: string) => { success: boolean; message?: string };
+  canAccessTab: (tab: ActiveTab) => boolean;
   
   // Supabase sync states & actions
   isSupabaseEnabled: boolean;
@@ -74,6 +98,8 @@ const STORAGE_KEY_INDICATORS = 'madiun_anggaran_indicators_v7';
 const STORAGE_KEY_TRANSACTIONS = 'madiun_anggaran_transactions_v7';
 const STORAGE_KEY_ALIH_DAYA = 'madiun_anggaran_alih_daya_v1';
 const STORAGE_KEY_LOGS = 'madiun_anggaran_logs_v7';
+const STORAGE_KEY_USERS = 'madiun_anggaran_users_v1';
+const STORAGE_KEY_CURRENT_USER = 'madiun_anggaran_current_user_v1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(() => {
@@ -348,6 +374,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(7); // Default to August (0-indexed = 7)
 
+  // Users & Current Active User
+  const [users, setUsers] = useState<AppUser[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_USERS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse saved users', e);
+      }
+    }
+    return DEFAULT_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<AppUser>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_CURRENT_USER);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.role) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse current user', e);
+      }
+    }
+    return DEFAULT_USERS[0];
+  });
+
   // Supabase sync states
   const [isSupabaseEnabled] = useState<boolean>(() => isSupabaseConfigured());
   const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
@@ -369,7 +426,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       alihDayaContracts,
       importLogs,
       selectedYear,
-      selectedMonth
+      selectedMonth,
+      users
     };
     const res = await saveRemoteState(payload);
     isSyncingRef.current = false;
@@ -381,7 +439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSupabaseSyncStatus('error');
       return { success: false, error: res.error };
     }
-  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, selectedYear, selectedMonth]);
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, selectedYear, selectedMonth, users]);
 
   // Load latest state from Supabase
   const loadFromSupabase = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
@@ -405,6 +463,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (Array.isArray(remote.importLogs)) {
         setImportLogs(remote.importLogs);
+      }
+      if (Array.isArray(remote.users) && remote.users.length > 0) {
+        setUsers(remote.users);
       }
       if (remote.selectedYear) setSelectedYear(remote.selectedYear);
       if (remote.selectedMonth !== undefined) setSelectedMonth(remote.selectedMonth);
@@ -446,6 +507,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(importLogs));
   }, [importLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_CURRENT_USER, JSON.stringify(currentUser));
+  }, [currentUser]);
 
   // Debounced auto-save to Supabase when data changes
   useEffect(() => {
@@ -1187,6 +1256,111 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedMonth(7);
   };
 
+  const canAccessTab = useCallback((tab: ActiveTab): boolean => {
+    const roleConfig = ROLE_PERMISSIONS[currentUser.role];
+    if (!roleConfig) return false;
+    return roleConfig.allowedTabs.includes(tab);
+  }, [currentUser.role]);
+
+  const addUser = useCallback((userData: Omit<AppUser, 'id' | 'createdAt'>): { success: boolean; message?: string } => {
+    const trimmedNip = userData.nip.trim();
+    if (!trimmedNip) {
+      return { success: false, message: 'NIP wajib diisi.' };
+    }
+    if (!userData.nama.trim()) {
+      return { success: false, message: 'Nama wajib diisi.' };
+    }
+    if (!userData.password) {
+      return { success: false, message: 'Password wajib diisi.' };
+    }
+    if (users.some(u => u.nip.trim() === trimmedNip)) {
+      return { success: false, message: `NIP "${trimmedNip}" sudah terdaftar dalam sistem.` };
+    }
+
+    const newUser: AppUser = {
+      ...userData,
+      nama: userData.nama.trim(),
+      nip: trimmedNip,
+      jabatan: userData.jabatan.trim() || 'Staff',
+      id: `user-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    setUsers(prev => [...prev, newUser]);
+    return { success: true };
+  }, [users]);
+
+  const updateUser = useCallback((id: string, updated: Partial<AppUser>): { success: boolean; message?: string } => {
+    if (updated.nip) {
+      const trimmedNip = updated.nip.trim();
+      if (users.some(u => u.id !== id && u.nip.trim() === trimmedNip)) {
+        return { success: false, message: `NIP "${trimmedNip}" sudah digunakan oleh user lain.` };
+      }
+    }
+
+    setUsers(prev => prev.map(u => {
+      if (u.id === id) {
+        const updatedUser = { 
+          ...u, 
+          ...updated,
+          nama: updated.nama ? updated.nama.trim() : u.nama,
+          nip: updated.nip ? updated.nip.trim() : u.nip,
+          jabatan: updated.jabatan !== undefined ? updated.jabatan.trim() : u.jabatan,
+        };
+        if (id === currentUser.id) {
+          setCurrentUser(updatedUser);
+        }
+        return updatedUser;
+      }
+      return u;
+    }));
+
+    return { success: true };
+  }, [users, currentUser.id]);
+
+  const deleteUser = useCallback((id: string): { success: boolean; message?: string } => {
+    if (id === currentUser.id) {
+      return { success: false, message: 'Tidak dapat menghapus akun yang sedang aktif digunakan.' };
+    }
+
+    const target = users.find(u => u.id === id);
+    if (!target) {
+      return { success: false, message: 'User tidak ditemukan.' };
+    }
+
+    if (target.role === 'admin') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        return { success: false, message: 'Tidak dapat menghapus admin terakhir dalam sistem.' };
+      }
+    }
+
+    setUsers(prev => prev.filter(u => u.id !== id));
+    return { success: true };
+  }, [users, currentUser.id]);
+
+  const switchUser = useCallback((userId: string) => {
+    const target = users.find(u => u.id === userId);
+    if (target) {
+      setCurrentUser(target);
+    }
+  }, [users]);
+
+  const loginUser = useCallback((nipOrNama: string, password: string): { success: boolean; message?: string } => {
+    const query = nipOrNama.trim().toLowerCase();
+    const matched = users.find(u => 
+      (u.nip.toLowerCase() === query || u.nama.toLowerCase() === query) &&
+      u.password === password
+    );
+
+    if (matched) {
+      setCurrentUser(matched);
+      return { success: true };
+    }
+
+    return { success: false, message: 'NIP / Nama atau Password tidak sesuai.' };
+  }, [users]);
+
   const exportDataJSON = () => {
     const data = {
       year: selectedYear,
@@ -1194,6 +1368,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       indicators,
       additionalTransactions,
       alihDayaContracts,
+      users,
       exportedAt: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1217,6 +1392,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedMonth,
         setSelectedYear,
         setSelectedMonth,
+        users,
+        currentUser,
+        addUser,
+        updateUser,
+        deleteUser,
+        switchUser,
+        loginUser,
+        canAccessTab,
         isSupabaseEnabled,
         supabaseSyncStatus,
         lastSyncTime,

@@ -20,7 +20,9 @@ import {
   FileSpreadsheet,
   FileEdit,
   TableProperties,
-  Target
+  Target,
+  Calculator,
+  FileText
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -59,7 +61,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
     alihDayaContracts,
     selectedYear, 
     selectedMonth,
-    setSelectedMonth 
+    setSelectedMonth,
+    canAccessTab 
   } = useApp();
 
   // Alih Daya summary computation
@@ -501,45 +504,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
       <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
           <Receipt className="w-4 h-4 text-blue-600" />
-          Aksi Cepat Kelola Data:
+          Aksi Cepat Menu:
         </span>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onNavigateTab('realization_input')}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            <span>Input Realisasi Manual</span>
-          </button>
+          {canAccessTab('realization_input') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('realization_input')}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Input Realisasi Manual</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onNavigateTab('realization_import')}
-            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs rounded-lg border border-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Import Excel</span>
-          </button>
+          {canAccessTab('realization_import') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('realization_import')}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs rounded-lg border border-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Import Excel</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onNavigateTab('budget_input')}
-            className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileEdit className="w-3.5 h-3.5 text-slate-500" />
-            <span>Input &amp; Edit Anggaran</span>
-          </button>
+          {canAccessTab('budget_input') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('budget_input')}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileEdit className="w-3.5 h-3.5 text-slate-500" />
+              <span>Input &amp; Edit Anggaran</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onNavigateTab('matrix')}
-            className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <TableProperties className="w-3.5 h-3.5 text-slate-500" />
-            <span>Matriks Monitoring</span>
-          </button>
+          {canAccessTab('matrix') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('matrix')}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <TableProperties className="w-3.5 h-3.5 text-slate-500" />
+              <span>Matriks Monitoring</span>
+            </button>
+          )}
+
+          {canAccessTab('prognosa') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('prognosa')}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Calculator className="w-3.5 h-3.5 text-slate-500" />
+              <span>Prognosa Anggaran</span>
+            </button>
+          )}
+
+          {canAccessTab('performance') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('performance')}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Target className="w-3.5 h-3.5 text-slate-500" />
+              <span>Indikator &amp; Kinerja</span>
+            </button>
+          )}
+
+          {canAccessTab('reports') && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('reports')}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>Laporan &amp; Ringkasan</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -740,13 +784,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               </p>
             </div>
           </div>
-          <button
-            onClick={() => onNavigateTab('alih_daya')}
-            className="text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto shadow-xs"
-          >
-            <span>Buka Monitoring Alih Daya</span>
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
+          {canAccessTab('alih_daya') && (
+            <button
+              onClick={() => onNavigateTab('alih_daya')}
+              className="text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto shadow-xs cursor-pointer"
+            >
+              <span>Buka Monitoring Alih Daya</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

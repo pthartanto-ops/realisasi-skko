@@ -80,7 +80,67 @@ export type ActiveTab =
   | 'performance'
   | 'prognosa'
   | 'alih_daya'
-  | 'reports';
+  | 'reports'
+  | 'user_management';
+
+export type UserRole = 'admin' | 'management' | 'user';
+
+export interface AppUser {
+  id: string;
+  nama: string;      // Nama
+  nip: string;       // NIP
+  jabatan: string;   // Jabatan
+  password: string;  // Password
+  role: UserRole;    // Role user
+  createdAt?: string;
+}
+
+export const ROLE_PERMISSIONS: Record<UserRole, {
+  label: string;
+  description: string;
+  badgeClass: string;
+  allowedTabs: ActiveTab[];
+}> = {
+  admin: {
+    label: 'Admin',
+    description: 'Akses penuh ke seluruh menu dan modul aplikasi serta manajemen user',
+    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    allowedTabs: [
+      'dashboard',
+      'alih_daya',
+      'prognosa',
+      'budget_input',
+      'realization_input',
+      'realization_import',
+      'matrix',
+      'performance',
+      'reports',
+      'user_management'
+    ]
+  },
+  management: {
+    label: 'Management',
+    description: 'Akses monitoring eksekutif: Dashboard Utama, Indikator & Kinerja, Laporan & Ringkasan',
+    badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    allowedTabs: [
+      'dashboard',
+      'performance',
+      'reports'
+    ]
+  },
+  user: {
+    label: 'User',
+    description: 'Akses operasional: Dashboard Utama, Indikator & Kinerja, Laporan & Ringkasan, Prognosa Anggaran, Matriks Monitoring',
+    badgeClass: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    allowedTabs: [
+      'dashboard',
+      'performance',
+      'reports',
+      'prognosa',
+      'matrix'
+    ]
+  }
+};
 
 export type StatusBeban = 'Tercatat' | 'Belum Tercatat';
 
