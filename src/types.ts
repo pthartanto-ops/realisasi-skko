@@ -134,14 +134,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, {
     badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
     allowedTabs: [
       'dashboard',
-      'alih_daya',
+      'performance',
+      'reports',
       'prognosa',
+      'alih_daya',
+      'matrix',
       'budget_input',
       'realization_input',
       'realization_import',
-      'matrix',
-      'performance',
-      'reports',
       'user_management'
     ]
   },

@@ -68,18 +68,27 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     exportFullReportToExcel(budgetItems, indicators, additionalTransactions, selectedYear, selectedMonth + 1);
   };
 
-  // All available nav items
-  const allNavItems: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }>; badge?: string }[] = [
+  // All available nav items in requested order:
+  // 1. Dashboard Utama, 2. Indikator & Kinerja, 3. Laporan & Ringkasan,
+  // 4. Prognosa Anggaran, 5. Monitoring Kontrak Rutin, 6. Matriks Monitoring,
+  // 7. Input & Edit Anggaran, 8. Input Realisasi Manual, 9. Import Excel, 10. Manajemen User
+  const allNavItems: { 
+    id: ActiveTab; 
+    label: string; 
+    icon: React.FC<{ className?: string }>; 
+    badge?: string;
+    hasDividerBefore?: boolean;
+  }[] = [
     { id: 'dashboard', label: 'Dashboard Utama', icon: LayoutDashboard },
-    { id: 'alih_daya', label: 'Monitoring Kontrak Rutin', icon: Briefcase, badge: `${alihDayaContracts.length}` },
-    { id: 'prognosa', label: 'Prognosa Anggaran', icon: Calculator },
-    { id: 'budget_input', label: 'Input & Edit Anggaran', icon: FileEdit, badge: `${budgetItems.filter(i => !i.isGroupHeader).length}` },
-    { id: 'realization_input', label: 'Input Realisasi Manual', icon: Receipt, badge: 'Manual' },
-    { id: 'realization_import', label: 'Import Excel', icon: FileSpreadsheet, badge: 'Excel / CSV' },
-    { id: 'matrix', label: 'Matriks Monitoring', icon: TableProperties },
     { id: 'performance', label: 'Indikator & Kinerja', icon: Target },
     { id: 'reports', label: 'Laporan & Ringkasan', icon: FileText },
-    { id: 'user_management', label: 'Manajemen User', icon: Users, badge: `${users.length}` }
+    { id: 'prognosa', label: 'Prognosa Anggaran', icon: Calculator, hasDividerBefore: true },
+    { id: 'alih_daya', label: 'Monitoring Kontrak Rutin', icon: Briefcase, badge: `${alihDayaContracts.length}` },
+    { id: 'matrix', label: 'Matriks Monitoring', icon: TableProperties },
+    { id: 'budget_input', label: 'Input & Edit Anggaran', icon: FileEdit, badge: `${budgetItems.filter(i => !i.isGroupHeader).length}`, hasDividerBefore: true },
+    { id: 'realization_input', label: 'Input Realisasi Manual', icon: Receipt, badge: 'Manual' },
+    { id: 'realization_import', label: 'Import Excel', icon: FileSpreadsheet, badge: 'Excel / CSV' },
+    { id: 'user_management', label: 'Manajemen User', icon: Users, badge: `${users.length}`, hasDividerBefore: true }
   ];
 
   // Filter based on currently logged in user's role permissions
@@ -324,35 +333,62 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
       </div>
 
       {/* Navigation Sub-Bar */}
-      <div className="bg-slate-950/80 border-t border-slate-800/80 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center space-x-1 overflow-x-auto py-1.5 no-scrollbar">
-          {visibleNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+      <div className="bg-slate-950/95 border-t border-slate-800/80 border-b border-slate-900 shadow-inner px-3 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <nav 
+            id="main-navigation-bar" 
+            aria-label="Navigasi Utama"
+            className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-2 no-scrollbar scroll-smooth"
+          >
+            {visibleNavItems.map((item, idx) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
 
-            return (
-              <button
-                key={item.id}
-                id={`nav-tab-${item.id}`}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
-                {item.badge && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
-                    isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+              return (
+                <React.Fragment key={item.id}>
+                  {/* Subtle group separator between logical functional modules */}
+                  {item.hasDividerBefore && idx > 0 && (
+                    <div 
+                      className="h-4.5 w-px bg-slate-800/90 my-auto mx-1 shrink-0 hidden md:block" 
+                      aria-hidden="true" 
+                    />
+                  )}
+
+                  <button
+                    id={`nav-tab-${item.id}`}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`group relative flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg text-xs whitespace-nowrap transition-all duration-150 cursor-pointer select-none shrink-0 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-600 text-white font-semibold shadow-sm shadow-blue-500/25 border border-blue-400/40 ring-1 ring-blue-400/20'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/70 border border-transparent hover:border-slate-700/60 font-medium'
+                    }`}
+                  >
+                    <Icon 
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 group-hover:scale-105 ${
+                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'
+                      }`} 
+                    />
+                    <span className="tracking-tight">{item.label}</span>
+                    {item.badge && (
+                      <span 
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors shrink-0 ${
+                          isActive 
+                            ? 'bg-blue-800/90 text-blue-100 border border-blue-400/30 shadow-xs' 
+                            : 'bg-slate-800/90 text-slate-400 group-hover:text-slate-300 border border-slate-700/70'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                    {/* Active bottom glow accent */}
+                    {isActive && (
+                      <span className="absolute -bottom-2 left-2 right-2 h-0.5 bg-blue-400 rounded-full shadow-xs shadow-blue-400" />
+                    )}
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
