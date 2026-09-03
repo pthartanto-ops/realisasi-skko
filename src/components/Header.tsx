@@ -67,21 +67,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const totalBudget = budgetItems
-    .filter(i => !i.isGroupHeader)
-    .reduce((sum, item) => sum + (item.budgetAnnual || 0), 0);
-
-  const totalRealizationYTD = budgetItems
-    .filter(i => !i.isGroupHeader)
-    .reduce((sum, item) => {
-      let itemYTD = 0;
-      for (let m = 0; m <= selectedMonth; m++) {
-        itemYTD += (item.realizationMonthly?.[m] || 0);
-      }
-      return sum + itemYTD;
-    }, 0);
-
-  const absorptionRate = totalBudget > 0 ? (totalRealizationYTD / totalBudget) * 100 : 0;
 
   const handleExport = () => {
     exportFullReportToExcel(budgetItems, indicators, additionalTransactions, selectedYear, selectedMonth + 1);
@@ -177,23 +162,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               </div>
             </div>
 
-            {/* Quick Summary Pill */}
-            <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/70 text-xs">
-              <div>
-                <span className="text-slate-400 block text-[10px]">Realisasi s/d {MONTH_NAMES[selectedMonth]}</span>
-                <span className="font-bold text-white">{formatRupiahShort(totalRealizationYTD)}</span>
-              </div>
-              <div className="h-5 w-px bg-slate-700" />
-              <div>
-                <span className="text-slate-400 block text-[10px]">Serapan YTD</span>
-                <span className={`font-bold flex items-center gap-1 ${
-                  absorptionRate > 95 ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  <TrendingUp className="w-3 h-3" />
-                  {formatPercent(absorptionRate, 1)}
-                </span>
-              </div>
-            </div>
 
             {/* Actions & User Profile */}
             <div className="flex items-center gap-2">
