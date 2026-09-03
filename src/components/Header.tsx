@@ -3,7 +3,6 @@ import {
   Building2, 
   Calendar, 
   Download, 
-  RotateCcw, 
   TrendingUp, 
   LayoutDashboard, 
   FileEdit, 
@@ -37,7 +36,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     selectedMonth, 
     setSelectedYear, 
     setSelectedMonth, 
-    resetToDefault,
     isSupabaseEnabled,
     supabaseSyncStatus
   } = useApp();
@@ -185,20 +183,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               >
                 <Download className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Export Excel</span>
-              </button>
-
-              <button
-                id="btn-reset-header-data"
-                onClick={() => {
-                  if (confirm('Reset seluruh data ke kondisi awal dari template Google Sheet? Perubahan manual akan dikembalikan.')) {
-                    resetToDefault();
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
-                title="Muat ulang data awal dari Google Sheet template"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden xl:inline">Reset Data</span>
               </button>
             </div>
           </div>

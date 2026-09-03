@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileEdit,
   Search,
@@ -42,6 +42,7 @@ export const RealizationInputView: React.FC = () => {
     budgetItems,
     selectedYear,
     selectedMonth,
+    setSelectedMonth,
     updateRealization,
     updateAccountRealizationMonthly,
     batchUpdateMonthRealization,
@@ -53,8 +54,12 @@ export const RealizationInputView: React.FC = () => {
   // Active sub-mode
   const [activeMode, setActiveMode] = useState<RealizationMode>('monthly_focus');
   
-  // Target month for focus input (0-11, defaults to selectedMonth)
-  const [focusMonth, setFocusMonth] = useState<number>(selectedMonth);
+  // Target month for focus input (Bulan Aktif) is synchronized with Cut-off s.d. (selectedMonth)
+  const focusMonth = selectedMonth;
+  const setFocusMonth = (val: number | ((prev: number) => number)) => {
+    const nextVal = typeof val === 'function' ? val(selectedMonth) : val;
+    setSelectedMonth(nextVal);
+  };
   
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +70,11 @@ export const RealizationInputView: React.FC = () => {
   const [draftInputs, setDraftInputs] = useState<Record<string, string>>({});
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
+  // Clear uncommitted drafts when active/cut-off month changes
+  useEffect(() => {
+    setDraftInputs({});
+  }, [selectedMonth]);
+
   // Single Entry Form state
   const [entryAccountId, setEntryAccountId] = useState<string>('');
   const [entryMonth, setEntryMonth] = useState<number>(selectedMonth);
@@ -72,6 +82,11 @@ export const RealizationInputView: React.FC = () => {
   const [entryMode, setEntryMode] = useState<'add' | 'replace'>('replace');
   const [entryNote, setEntryNote] = useState<string>('');
   const [entrySuccessMsg, setEntrySuccessMsg] = useState<string | null>(null);
+
+  // Keep single entry form month in sync with active/cut-off month
+  useEffect(() => {
+    setEntryMonth(selectedMonth);
+  }, [selectedMonth]);
 
   // Modal 12-Month Edit for single account
   const [editingItem12M, setEditingItem12M] = useState<BudgetItem | null>(null);
@@ -977,7 +992,11 @@ export const RealizationInputView: React.FC = () => {
                   </label>
                   <select
                     value={entryMonth}
-                    onChange={(e) => setEntryMonth(Number(e.target.value))}
+                    onChange={(e) => {
+                      const m = Number(e.target.value);
+                      setEntryMonth(m);
+                      setSelectedMonth(m);
+                    }}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer"
                   >
                     {MONTH_NAMES.map((m, idx) => (

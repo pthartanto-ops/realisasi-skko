@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   UploadCloud, 
   FileSpreadsheet, 
@@ -31,7 +31,8 @@ export const RealizationImportView: React.FC = () => {
     deleteImportLog,
     importLogs, 
     selectedYear, 
-    selectedMonth 
+    selectedMonth,
+    setSelectedMonth
   } = useApp();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -48,6 +49,11 @@ export const RealizationImportView: React.FC = () => {
   const [importTargetOption, setImportTargetOption] = useState<'all' | 'specific'>('all');
   const [targetSpecificMonth, setTargetSpecificMonth] = useState<number>(selectedMonth);
   const [importResult, setImportResult] = useState<{ success: boolean; message: string; count: number } | null>(null);
+
+  // Sync specific target month with cut-off s.d.
+  useEffect(() => {
+    setTargetSpecificMonth(selectedMonth);
+  }, [selectedMonth]);
   
   // State for Month Realization Deletion Modal
   const [monthToDelete, setMonthToDelete] = useState<number | null>(null);
@@ -427,7 +433,11 @@ export const RealizationImportView: React.FC = () => {
                   {importTargetOption === 'specific' && (
                     <select
                       value={targetSpecificMonth}
-                      onChange={(e) => setTargetSpecificMonth(Number(e.target.value))}
+                      onChange={(e) => {
+                        const m = Number(e.target.value);
+                        setTargetSpecificMonth(m);
+                        setSelectedMonth(m);
+                      }}
                       className="w-full px-2 py-1 bg-white border border-blue-400 rounded text-xs font-semibold text-blue-900 focus:outline-none"
                     >
                       {MONTH_NAMES.map((m, idx) => (
