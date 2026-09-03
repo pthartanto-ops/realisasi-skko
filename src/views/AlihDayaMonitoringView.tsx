@@ -427,12 +427,12 @@ export const AlihDayaMonitoringView: React.FC = () => {
           terminTagihan: `Termin ${idx + 1} (${mName} ${defaultYear})`,
           bulanIndex: idx,
           glAccount: formGLDefault.trim() || '6106201700',
-          glAccountName: formGLNameDefault.trim() || 'Beban Jasa Alih Daya',
+          glAccountName: formGLNameDefault.trim() || 'Beban Jasa Kontrak Rutin',
           nominalTagihan: 0,
           documentNumber: '',
           statusBeban: 'Belum Tercatat',
           tanggalJatuhTempo: `${defaultYear}-${monthNum}-${lastDay}`,
-          notes: `Tagihan alih daya bulan ${mName}`
+          notes: `Tagihan kontrak rutin bulan ${mName}`
         };
       });
 
@@ -474,7 +474,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setFormTerminMonthIndex(targetMonth);
     setFormTerminName(`Termin ${(contract?.termins.length || 0) + 1} (${MONTH_NAMES[targetMonth]} ${year})`);
     setFormTerminGL(contract?.glAccountDefault || '6106201700');
-    setFormTerminGLName(contract?.glAccountNameDefault || contract?.glAccountDefaultName || 'Beban Alih Daya');
+    setFormTerminGLName(contract?.glAccountNameDefault || contract?.glAccountDefaultName || 'Beban Kontrak Rutin');
     setFormTerminNominal(0);
     setFormTerminDocNum('');
     setFormTerminTanggal(`${year}-${monthNum}-${lastDay}`);
@@ -607,7 +607,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  Monitoring Alih Daya
+                  Monitoring Kontrak Rutin
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
                   Tahun Anggaran {selectedYear || 2026}
@@ -618,7 +618,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 </span>
               </div>
               <p className="text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">
-                Pemantauan kontrak alih daya (Outsourcing) per bulan, rincian termin tagihan bulanan, pembebanan GL Account, serta status pencatatan No Dokumen SAP.
+                Pemantauan kontrak rutin per bulan, rincian termin tagihan bulanan, pembebanan GL Account, serta status pencatatan No Dokumen SAP.
               </p>
             </div>
           </div>
@@ -629,7 +629,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               id="btn-export-alih-daya"
               onClick={handleExportExcel}
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 transition-colors"
-              title="Export data monitoring alih daya ke format Excel (termasuk Matriks 12 Bulan &amp; Rincian Termin)"
+              title="Export data monitoring kontrak rutin ke format Excel (termasuk Matriks 12 Bulan &amp; Rincian Termin)"
             >
               <Download className="w-4 h-4 text-slate-600" />
               <span>Export Excel</span>
@@ -991,7 +991,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 <span>Matriks Tagihan Bulanan 12 Bulan (Januari s.d. Desember {selectedYear || 2026})</span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tabel horizontal sebaran tagihan alih daya per bulan. Klik pada sel bulan untuk melihat atau menginputkan Nomor Dokumen SAP secara langsung.
+                Tabel horizontal sebaran tagihan kontrak rutin per bulan. Klik pada sel bulan untuk melihat atau menginputkan Nomor Dokumen SAP secara langsung.
               </p>
             </div>
 
@@ -1273,7 +1273,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-base font-semibold text-slate-700">Tidak ada data kontrak yang cocok</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Coba sesuaikan kata kunci pencarian, periode bulan, atau filter status beban untuk menemukan kontrak alih daya.
+                Coba sesuaikan kata kunci pencarian, periode bulan, atau filter status beban untuk menemukan kontrak rutin.
               </p>
               <button
                 onClick={handleOpenAddContract}
@@ -1646,7 +1646,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-600" />
                 <span>
-                  Rekapitulasi Per Kontrak Alih Daya{' '}
+                  Rekapitulasi Per Kontrak Rutin{' '}
                   {numericMonth !== null ? `(Bulan ${MONTH_NAMES[numericMonth]} & Tahunan)` : '(Tahunan 2026)'}
                 </span>
               </h2>
@@ -1694,7 +1694,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 {filteredContracts.length === 0 ? (
                   <tr>
                     <td colSpan={numericMonth !== null ? 12 : 10} className="py-8 text-center text-slate-400 italic">
-                      Belum ada data kontrak alih daya.
+                      Belum ada data kontrak rutin.
                     </td>
                   </tr>
                 ) : (
@@ -1847,7 +1847,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-600" />
                 <span>
-                  Daftar Seluruh Rincian Tagihan Alih Daya{' '}
+                  Daftar Seluruh Rincian Tagihan Kontrak Rutin{' '}
                   {numericMonth !== null ? `(Bulan ${MONTH_NAMES[numericMonth]})` : '(Semua Bulan)'}
                 </span>
               </h2>
@@ -2092,7 +2092,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               <div className="flex items-center gap-2.5">
                 <Briefcase className="w-5 h-5 text-blue-300" />
                 <h3 className="font-bold text-base">
-                  {editingContract ? 'Edit Kontrak Alih Daya' : 'Tambah Kontrak Alih Daya Baru'}
+                  {editingContract ? 'Edit Kontrak Rutin' : 'Tambah Kontrak Rutin Baru'}
                 </h3>
               </div>
               <button

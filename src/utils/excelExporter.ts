@@ -90,7 +90,7 @@ export function exportFullReportToExcel(
   const indSheet = XLSX.utils.aoa_to_sheet(indicatorData);
   XLSX.utils.book_append_sheet(workbook, indSheet, 'INDIKATOR_KINERJA');
 
-  // 3. Sheet: PROGNOSA & ALIH DAYA
+  // 3. Sheet: PROGNOSA & KONTRAK RUTIN
   const prognosaHeaders = [
     'KATEGORI',
     'URAIAN PEKERJAAN / TRANSAKSI',
@@ -121,7 +121,7 @@ export function exportFullReportToExcel(
   const prognosaSheet = XLSX.utils.aoa_to_sheet(prognosaData);
   XLSX.utils.book_append_sheet(workbook, prognosaSheet, 'TAMBAHAN_TRANSAKSI');
 
-  // 4. Sheet: ALIH DAYA (if provided)
+  // 4. Sheet: KONTRAK RUTIN (if provided)
   if (alihDayaContracts && alihDayaContracts.length > 0) {
     const alihDayaHeaders = [
       'NAMA KONTRAK',
@@ -149,7 +149,7 @@ export function exportFullReportToExcel(
       });
     });
     const adSheet = XLSX.utils.aoa_to_sheet(alihDayaData);
-    XLSX.utils.book_append_sheet(workbook, adSheet, 'MONITORING_ALIH_DAYA');
+    XLSX.utils.book_append_sheet(workbook, adSheet, 'MONITORING_KONTRAK_RUTIN');
   }
 
   const filename = `Laporan_Pemantauan_Realisasi_Anggaran_${year}_Cutoff_M${monthCutoff}.xlsx`;
@@ -357,6 +357,6 @@ export function exportAlihDayaToExcel(
   const terminSheet = XLSX.utils.aoa_to_sheet(terminData);
   XLSX.utils.book_append_sheet(workbook, terminSheet, 'RINCIAN_TERMIN');
 
-  const filename = `Monitoring_Alih_Daya_Madiun_${year}.xlsx`;
+  const filename = `Monitoring_Kontrak_Rutin_Madiun_${year}.xlsx`;
   XLSX.writeFile(workbook, filename);
 }

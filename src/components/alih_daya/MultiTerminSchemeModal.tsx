@@ -33,13 +33,13 @@ export const MultiTerminSchemeModal: React.FC<MultiTerminSchemeModalProps> = ({
   const [tagihan1Name, setTagihan1Name] = useState('Termin 1 (Upah / Gaji Pokok)');
   const [tagihan1Amount, setTagihan1Amount] = useState<number>(60000000);
   const [tagihan1GL, setTagihan1GL] = useState(contract.glAccountDefault || '6106201700');
-  const [tagihan1GLName, setTagihan1GLName] = useState(contract.glAccountNameDefault || 'Beban Jasa Tenaga Kerja Alih Daya');
+  const [tagihan1GLName, setTagihan1GLName] = useState(contract.glAccountNameDefault || 'Beban Jasa Tenaga Kerja Kontrak Rutin');
 
   // Tagihan 2 config
   const [tagihan2Name, setTagihan2Name] = useState('Termin 2 (Management Fee, BPJS & Ops)');
   const [tagihan2Amount, setTagihan2Amount] = useState<number>(25500000);
   const [tagihan2GL, setTagihan2GL] = useState(contract.glAccountDefault || '6106201700');
-  const [tagihan2GLName, setTagihan2GLName] = useState(contract.glAccountNameDefault || 'Beban Jasa Tenaga Kerja Alih Daya');
+  const [tagihan2GLName, setTagihan2GLName] = useState(contract.glAccountNameDefault || 'Beban Jasa Tenaga Kerja Kontrak Rutin');
 
   // Single Tagihan config (if 1 per month selected)
   const [singleTagihanName, setSingleTagihanName] = useState('Termin Bulanan');
@@ -70,7 +70,7 @@ export const MultiTerminSchemeModal: React.FC<MultiTerminSchemeModalProps> = ({
           terminTagihan: `${tagihan1Name} - ${mName} ${year}`,
           bulanIndex: mIdx,
           glAccount: tagihan1GL.trim() || contract.glAccountDefault || '6106201700',
-          glAccountName: tagihan1GLName.trim() || 'Beban Jasa Tenaga Kerja Alih Daya',
+          glAccountName: tagihan1GLName.trim() || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
           posType: contract.posAnggaran || contract.posType || 'Pos 53',
           nominalTagihan: tagihan1Amount,
           amount: tagihan1Amount,
@@ -86,7 +86,7 @@ export const MultiTerminSchemeModal: React.FC<MultiTerminSchemeModalProps> = ({
           terminTagihan: `${tagihan2Name} - ${mName} ${year}`,
           bulanIndex: mIdx,
           glAccount: tagihan2GL.trim() || contract.glAccountDefault || '6106201700',
-          glAccountName: tagihan2GLName.trim() || 'Beban Jasa Tenaga Kerja Alih Daya',
+          glAccountName: tagihan2GLName.trim() || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
           posType: contract.posAnggaran || contract.posType || 'Pos 53',
           nominalTagihan: tagihan2Amount,
           amount: tagihan2Amount,
@@ -102,7 +102,7 @@ export const MultiTerminSchemeModal: React.FC<MultiTerminSchemeModalProps> = ({
           terminTagihan: `${singleTagihanName} ${mIdx + 1} (${mName} ${year})`,
           bulanIndex: mIdx,
           glAccount: tagihan1GL.trim() || contract.glAccountDefault || '6106201700',
-          glAccountName: tagihan1GLName.trim() || 'Beban Jasa Tenaga Kerja Alih Daya',
+          glAccountName: tagihan1GLName.trim() || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
           posType: contract.posAnggaran || contract.posType || 'Pos 53',
           nominalTagihan: singleTagihanAmount,
           amount: singleTagihanAmount,

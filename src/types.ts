@@ -42,13 +42,38 @@ export interface IndicatorTarget {
   targetRule?: string;
 }
 
+export interface AlihDayaMonthlyContractItem {
+  contractId: string;
+  contractName: string;
+  contractNumber?: string;
+  vendor?: string;
+  terminId: string;
+  terminLabel: string;
+  nominal: number;
+  documentNumber?: string;
+  statusBeban: StatusBeban;
+  isOpen: boolean;
+  glAccount?: string;
+  glAccountName?: string;
+}
+
+export interface AlihDayaMonthlyDetail {
+  openAmount: number;
+  documentedAmount: number;
+  totalAmount: number;
+  openCount: number;
+  documentedCount: number;
+  totalCount: number;
+  contracts: AlihDayaMonthlyContractItem[];
+}
+
 export interface AdditionalTransaction {
   id: string;
   posType: PosType;
   posName?: string;
   glAccount?: string; // Kode Akun GL (contoh: "6106200700", "6107200800")
   glAccountName?: string; // Nama Akun GL (contoh: "Beban jasa borong Gardu Induk")
-  category: string; // "PEKERJAAN ALIH DAYA", "TAGIHAN NON RAB", "RINCIAN PEKERJAAN", "SEWA NON AHG"
+  category: string; // "PEKERJAAN KONTRAK RUTIN", "TAGIHAN NON RAB", "RINCIAN PEKERJAAN", "SEWA NON AHG"
   name: string; // e.g. "Security Tahap I", "Cleaning Service", "Fixcost Driver"
   month: number; // 0-11
   year?: number;
@@ -57,6 +82,8 @@ export interface AdditionalTransaction {
   note?: string;
   notes?: string;
   isActive: boolean;
+  isFromAlihDaya?: boolean;
+  alihDayaDetail?: AlihDayaMonthlyDetail;
 }
 
 export interface ImportLog {

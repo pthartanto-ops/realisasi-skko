@@ -31,10 +31,11 @@ import {
   ChevronRight,
   Hash,
   Tag,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Eye
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { AdditionalTransaction, PosType } from '../types';
+import { AdditionalTransaction, PosType, ActiveTab } from '../types';
 import { 
   formatRupiah, 
   formatRupiahShort, 
@@ -42,14 +43,21 @@ import {
   MONTH_NAMES, 
   MONTH_SHORT_NAMES 
 } from '../utils/formatters';
+import { AlihDayaCommitmentDetailModal } from '../components/AlihDayaCommitmentDetailModal';
 
-export const PrognosaView: React.FC = () => {
+interface PrognosaViewProps {
+  onNavigateTab?: (tab: ActiveTab) => void;
+}
+
+export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => {
   const { 
     budgetItems, 
     additionalTransactions, 
     addAdditionalTransaction, 
     updateAdditionalTransaction, 
     deleteAdditionalTransaction,
+    alihDayaContracts,
+    quickUpdateTerminDocNumber,
     selectedYear, 
     selectedMonth,
     setSelectedMonth 
@@ -57,6 +65,7 @@ export const PrognosaView: React.FC = () => {
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AdditionalTransaction | null>(null);
+  const [selectedAlihDayaItem, setSelectedAlihDayaItem] = useState<AdditionalTransaction | null>(null);
   const [filterPos, setFilterPos] = useState<string>('ALL');
   const [filterDocStatus, setFilterDocStatus] = useState<'ALL' | 'OPEN' | 'DOCUMENTED'>('ALL');
   const [filterMonth, setFilterMonth] = useState<string>('CURRENT'); // 'CURRENT' | 'ALL' | '0'..'11'
@@ -69,6 +78,12 @@ export const PrognosaView: React.FC = () => {
   const hasDocNumber = (t: AdditionalTransaction) => {
     return Boolean(t.documentNumber && t.documentNumber.trim().length > 0);
   };
+
+  // Sinkronisasi item Kontrak Rutin yang sedang dibuka di modal dengan data transaksi terbaru
+  const activeAlihDayaItem = useMemo(() => {
+    if (!selectedAlihDayaItem) return null;
+    return additionalTransactions.find(t => t.id === selectedAlihDayaItem.id) || selectedAlihDayaItem;
+  }, [selectedAlihDayaItem, additionalTransactions]);
 
   // Map of GL Accounts extracted from budgetItems grouped by POS
   const glAccountsByPos = useMemo(() => {
@@ -138,7 +153,7 @@ export const PrognosaView: React.FC = () => {
     posType: 'Pos 53',
     glAccount: '6106200700',
     glAccountName: 'Beban jasa borong Gardu Induk',
-    category: 'PEKERJAAN ALIH DAYA',
+    category: 'PEKERJAAN KONTRAK RUTIN',
     amount: 50000000,
     month: selectedMonth,
     documentNumber: '',
@@ -417,7 +432,7 @@ export const PrognosaView: React.FC = () => {
       posType: pos,
       glAccount: glCode !== '-' ? glCode : '',
       glAccountName: glName !== 'Tanpa Akun GL' ? glName : '',
-      category: pos === 'Pos 53' ? 'PEKERJAAN ALIH DAYA' : pos === 'Beban Sewa' ? 'SEWA NON AHG' : 'RINCIAN PEKERJAAN',
+      category: pos === 'Pos 53' ? 'PEKERJAAN KONTRAK RUTIN' : pos === 'Beban Sewa' ? 'SEWA NON AHG' : 'RINCIAN PEKERJAAN',
       amount: 25000000,
       month: selectedMonth,
       documentNumber: '',
@@ -502,7 +517,7 @@ export const PrognosaView: React.FC = () => {
               setFormData({
                 name: '',
                 posType: 'Pos 53',
-                category: 'Tenaga Alih Daya',
+                category: 'Tenaga Kontrak Rutin',
                 amount: 50000000,
                 month: selectedMonth,
                 documentNumber: '',
@@ -730,7 +745,7 @@ export const PrognosaView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-sm text-slate-900">Daftar Komitmen Tambahan Transaksi & Alih Daya</h3>
+                <h3 className="font-bold text-sm text-slate-900">Daftar Komitmen Tambahan Transaksi & Kontrak Rutin</h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
                   {filteredTransactions.length} Transaksi
                 </span>
@@ -784,7 +799,7 @@ export const PrognosaView: React.FC = () => {
                     posType: 'Pos 53',
                     glAccount: '6106200700',
                     glAccountName: 'Beban jasa borong Gardu Induk',
-                    category: 'PEKERJAAN ALIH DAYA',
+                    category: 'PEKERJAAN KONTRAK RUTIN',
                     amount: 50000000,
                     month: selectedMonth,
                     documentNumber: '',
@@ -1034,8 +1049,16 @@ export const PrognosaView: React.FC = () => {
 
                                         {/* Uraian */}
                                         <td className="py-2.5 px-4">
-                                          <div className={`font-semibold ${hasDoc ? 'text-slate-700' : 'text-slate-900'}`}>
-                                            {t.name}
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <div className={`font-semibold ${hasDoc ? 'text-slate-700' : 'text-slate-900'}`}>
+                                              {t.name}
+                                            </div>
+                                            {t.isFromAlihDaya && (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                                <Layers className="w-3 h-3 text-blue-600" />
+                                                Kontrak Rutin (Bulanan)
+                                              </span>
+                                            )}
                                           </div>
                                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                             <span className="text-[10px] text-slate-400 font-mono">{t.category}</span>
@@ -1045,87 +1068,150 @@ export const PrognosaView: React.FC = () => {
                                               </span>
                                             )}
                                           </div>
+                                          {t.isFromAlihDaya && t.alihDayaDetail && (
+                                            <div className="mt-1.5 flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => setSelectedAlihDayaItem(t)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors shadow-xs cursor-pointer"
+                                                title="Lihat rincian tagihan kontrak rutin pembentuk komitmen ini"
+                                              >
+                                                <Eye className="w-3 h-3" />
+                                                Rincian Tagihan ({t.alihDayaDetail.totalCount})
+                                              </button>
+                                              <span className="text-[10px] text-slate-500 font-medium">
+                                                {t.alihDayaDetail.openCount > 0 ? (
+                                                  <span className="text-amber-700 font-semibold">{t.alihDayaDetail.openCount} Open ({formatRupiahShort(t.alihDayaDetail.openAmount)})</span>
+                                                ) : (
+                                                  <span className="text-emerald-700 font-semibold">Semua Tercatat ({t.alihDayaDetail.totalCount})</span>
+                                                )}
+                                              </span>
+                                            </div>
+                                          )}
                                         </td>
 
                                         {/* Bulan */}
                                         <td className="py-2.5 px-3 text-center">
-                                          <select
-                                            value={t.month !== undefined ? t.month : selectedMonth}
-                                            onChange={(e) => updateAdditionalTransaction(t.id, { month: Number(e.target.value) })}
-                                            className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer ${
-                                              isCurrent 
-                                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold' 
-                                                : 'bg-white border-slate-200 text-slate-600'
-                                            }`}
-                                            title="Ubah alokasi bulan transaksi"
-                                          >
-                                            {MONTH_NAMES.map((name, mIdx) => (
-                                              <option key={name} value={mIdx}>{name}</option>
-                                            ))}
-                                          </select>
+                                          {t.isFromAlihDaya ? (
+                                            <span 
+                                              className={`inline-block text-xs px-2 py-1 rounded-md border font-bold ${
+                                                isCurrent 
+                                                  ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                                                  : 'bg-slate-100 border-slate-200 text-slate-700'
+                                              }`}
+                                              title="Bulan alokasi komitmen dihitung otomatis dari termin tagihan kontrak rutin"
+                                            >
+                                              {MONTH_NAMES[t.month !== undefined ? t.month : selectedMonth]}
+                                            </span>
+                                          ) : (
+                                            <select
+                                              value={t.month !== undefined ? t.month : selectedMonth}
+                                              onChange={(e) => updateAdditionalTransaction(t.id, { month: Number(e.target.value) })}
+                                              className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer ${
+                                                isCurrent 
+                                                  ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold' 
+                                                  : 'bg-white border-slate-200 text-slate-600'
+                                              }`}
+                                              title="Ubah alokasi bulan transaksi"
+                                            >
+                                              {MONTH_NAMES.map((name, mIdx) => (
+                                                <option key={name} value={mIdx}>{name}</option>
+                                              ))}
+                                            </select>
+                                          )}
                                         </td>
 
                                         {/* Nomor Dokumen / SPJ (Inline Edit) */}
                                         <td className="py-2 px-4">
-                                          <div className="relative">
-                                            <input
-                                              type="text"
-                                              value={t.documentNumber || ''}
-                                              placeholder="Ketik No. Dokumen / SPJ..."
-                                              onChange={(e) => {
-                                                updateAdditionalTransaction(t.id, { documentNumber: e.target.value });
-                                              }}
-                                              className={`w-full px-2.5 py-1 text-xs rounded-lg border transition-all focus:outline-none focus:ring-2 ${
-                                                hasDoc 
-                                                  ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-mono font-semibold focus:ring-emerald-200' 
-                                                  : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:ring-blue-100 focus:border-blue-500'
-                                              }`}
-                                              title="Jika terisi nomor dokumen, komitmen otomatis dikecualikan dari perhitungan prognosa tambahan"
-                                            />
-                                            {hasDoc && (
+                                          {t.isFromAlihDaya && hasDoc && t.documentNumber?.startsWith('TERCATAT SAP') ? (
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 font-mono">
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                                {t.documentNumber}
+                                              </span>
                                               <button
                                                 type="button"
-                                                onClick={() => updateAdditionalTransaction(t.id, { documentNumber: '' })}
-                                                className="absolute right-1.5 top-1.5 text-slate-400 hover:text-rose-600"
-                                                title="Hapus nomor dokumen (masukkan kembali ke komitmen terbuka)"
+                                                onClick={() => setSelectedAlihDayaItem(t)}
+                                                className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                                                title="Lihat rincian dokumen tagihan"
                                               >
-                                                <X className="w-3.5 h-3.5" />
+                                                <Eye className="w-3.5 h-3.5" />
                                               </button>
-                                            )}
-                                          </div>
+                                            </div>
+                                          ) : (
+                                            <div className="relative">
+                                              <input
+                                                type="text"
+                                                value={t.documentNumber || ''}
+                                                placeholder={t.isFromAlihDaya ? "Ketik No. SPJ / buka rincian..." : "Ketik No. Dokumen / SPJ..."}
+                                                onChange={(e) => {
+                                                  updateAdditionalTransaction(t.id, { documentNumber: e.target.value });
+                                                }}
+                                                className={`w-full px-2.5 py-1 text-xs rounded-lg border transition-all focus:outline-none focus:ring-2 ${
+                                                  hasDoc 
+                                                    ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-mono font-semibold focus:ring-emerald-200' 
+                                                    : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:ring-blue-100 focus:border-blue-500'
+                                                }`}
+                                                title={t.isFromAlihDaya ? "Jika terisi nomor dokumen, seluruh termin kontrak rutin pada pos & bulan ini ditandai tercatat dan dikecualikan dari prognosa" : "Jika terisi nomor dokumen, komitmen otomatis dikecualikan dari perhitungan prognosa tambahan"}
+                                              />
+                                              {hasDoc && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => updateAdditionalTransaction(t.id, { documentNumber: '' })}
+                                                  className="absolute right-1.5 top-1.5 text-slate-400 hover:text-rose-600"
+                                                  title="Hapus nomor dokumen (masukkan kembali ke komitmen terbuka)"
+                                                >
+                                                  <X className="w-3.5 h-3.5" />
+                                                </button>
+                                              )}
+                                            </div>
+                                          )}
                                         </td>
 
                                         {/* Nominal (Inline Edit) - Support Negative/Minus */}
                                         <td className="py-2 px-4 text-right">
-                                          <div className="flex flex-col items-end gap-0.5">
-                                            <div className="flex items-center justify-end gap-1">
-                                              <span className="text-[10px] text-slate-400 font-semibold">Rp</span>
-                                              <input
-                                                type="number"
-                                                value={t.amount === 0 ? '' : t.amount}
-                                                placeholder="0"
-                                                onChange={(e) => {
-                                                  const val = e.target.value === '' ? 0 : Number(e.target.value) || 0;
-                                                  updateAdditionalTransaction(t.id, { amount: val });
-                                                }}
-                                                className={`w-32 text-right px-2.5 py-1 text-xs font-mono font-bold border rounded-lg focus:outline-none transition-all ${
-                                                  hasDoc 
-                                                    ? 'bg-slate-100 border-slate-200 text-slate-500 line-through' 
-                                                    : t.amount < 0
-                                                    ? 'bg-rose-50 border-rose-300 text-rose-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-100'
-                                                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                                }`}
-                                                title="Ketik nominal langsung untuk mengubah (bisa nilai minus)"
-                                              />
-                                            </div>
-                                            {t.amount !== 0 && (
-                                              <span className={`text-[10px] font-mono ${
-                                                hasDoc ? 'text-slate-400 line-through' : t.amount < 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'
+                                          {t.isFromAlihDaya ? (
+                                            <div className="flex flex-col items-end gap-0.5">
+                                              <span className={`text-xs font-mono font-bold ${
+                                                hasDoc ? 'text-slate-400 line-through' : 'text-slate-900'
                                               }`}>
-                                                {formatRupiahShort(t.amount)}
+                                                {formatRupiah(t.amount)}
                                               </span>
-                                            )}
-                                          </div>
+                                              <span className="text-[10px] text-slate-500 font-mono">
+                                                {hasDoc ? 'Tercatat di SAP (Rp 0)' : `${t.alihDayaDetail?.openCount || 0} tagihan open`}
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex flex-col items-end gap-0.5">
+                                              <div className="flex items-center justify-end gap-1">
+                                                <span className="text-[10px] text-slate-400 font-semibold">Rp</span>
+                                                <input
+                                                  type="number"
+                                                  value={t.amount === 0 ? '' : t.amount}
+                                                  placeholder="0"
+                                                  onChange={(e) => {
+                                                    const val = e.target.value === '' ? 0 : Number(e.target.value) || 0;
+                                                    updateAdditionalTransaction(t.id, { amount: val });
+                                                  }}
+                                                  className={`w-32 text-right px-2.5 py-1 text-xs font-mono font-bold border rounded-lg focus:outline-none transition-all ${
+                                                    hasDoc 
+                                                      ? 'bg-slate-100 border-slate-200 text-slate-500 line-through' 
+                                                      : t.amount < 0
+                                                      ? 'bg-rose-50 border-rose-300 text-rose-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-100'
+                                                      : 'bg-white border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                                                  }`}
+                                                  title="Ketik nominal langsung untuk mengubah (bisa nilai minus)"
+                                                />
+                                              </div>
+                                              {t.amount !== 0 && (
+                                                <span className={`text-[10px] font-mono ${
+                                                  hasDoc ? 'text-slate-400 line-through' : t.amount < 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'
+                                                }`}>
+                                                  {formatRupiahShort(t.amount)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
                                         </td>
 
                                         {/* Status Perhitungan */}
@@ -1161,13 +1247,14 @@ export const PrognosaView: React.FC = () => {
                                         <td className="py-2.5 px-3 text-center">
                                           <button
                                             type="button"
+                                            disabled={t.isFromAlihDaya}
                                             onClick={() => updateAdditionalTransaction(t.id, { isActive: !t.isActive })}
                                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
                                               t.isActive 
                                                 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
                                                 : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                                            }`}
-                                            title="Klik untuk mengubah status aktif"
+                                            } ${t.isFromAlihDaya ? 'cursor-default opacity-85' : ''}`}
+                                            title={t.isFromAlihDaya ? "Status aktif komitmen kontrak rutin sinkron dengan kontrak" : "Klik untuk mengubah status aktif"}
                                           >
                                             {t.isActive ? 'Aktif' : 'Off'}
                                           </button>
@@ -1176,26 +1263,39 @@ export const PrognosaView: React.FC = () => {
                                         {/* Aksi */}
                                         <td className="py-2.5 px-3 text-center">
                                           <div className="flex items-center justify-center gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={() => setEditingItem(JSON.parse(JSON.stringify(t)))}
-                                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                              title="Edit Detail Komitmen"
-                                            >
-                                              <Edit3 className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                if (confirm(`Hapus komitmen "${t.name}"?`)) {
-                                                  deleteAdditionalTransaction(t.id);
-                                                }
-                                              }}
-                                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                              title="Hapus Komitmen"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                            {t.isFromAlihDaya ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => setSelectedAlihDayaItem(t)}
+                                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                                title="Lihat & Kelola Rincian Tagihan Kontrak Rutin"
+                                              >
+                                                <Eye className="w-4 h-4" />
+                                              </button>
+                                            ) : (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setEditingItem(JSON.parse(JSON.stringify(t)))}
+                                                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                  title="Edit Detail Komitmen"
+                                                >
+                                                  <Edit3 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    if (confirm(`Hapus komitmen "${t.name}"?`)) {
+                                                      deleteAdditionalTransaction(t.id);
+                                                    }
+                                                  }}
+                                                  className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                  title="Hapus Komitmen"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              </>
+                                            )}
                                           </div>
                                         </td>
                                       </tr>
@@ -1262,7 +1362,7 @@ export const PrognosaView: React.FC = () => {
                 <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200">
                   <tr>
                     <th className="py-3 px-3 w-10 text-center">No</th>
-                    <th className="py-3 px-4 min-w-[200px]">Uraian Transaksi / Alih Daya</th>
+                    <th className="py-3 px-4 min-w-[200px]">Uraian Transaksi / Kontrak Rutin</th>
                     <th className="py-3 px-3 w-28">Kelompok POS</th>
                     <th className="py-3 px-4 min-w-[180px]">Akun GL (GL Account)</th>
                     <th className="py-3 px-3 w-28 text-center">Bulan</th>
@@ -1297,8 +1397,16 @@ export const PrognosaView: React.FC = () => {
                           
                           {/* Uraian */}
                           <td className="py-3 px-4">
-                            <div className={`font-semibold ${hasDoc ? 'text-slate-700' : 'text-slate-900'}`}>
-                              {t.name}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <div className={`font-semibold ${hasDoc ? 'text-slate-700' : 'text-slate-900'}`}>
+                                {t.name}
+                              </div>
+                              {t.isFromAlihDaya && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                  <Layers className="w-3 h-3 text-blue-600" />
+                                  Kontrak Rutin (Bulanan)
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-slate-400 font-mono">{t.category}</span>
@@ -1308,6 +1416,26 @@ export const PrognosaView: React.FC = () => {
                                 </span>
                               )}
                             </div>
+                            {t.isFromAlihDaya && t.alihDayaDetail && (
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedAlihDayaItem(t)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors shadow-xs cursor-pointer"
+                                  title="Lihat rincian tagihan kontrak rutin pembentuk komitmen ini"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  Rincian Tagihan ({t.alihDayaDetail.totalCount})
+                                </button>
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  {t.alihDayaDetail.openCount > 0 ? (
+                                    <span className="text-amber-700 font-semibold">{t.alihDayaDetail.openCount} Open ({formatRupiahShort(t.alihDayaDetail.openAmount)})</span>
+                                  ) : (
+                                    <span className="text-emerald-700 font-semibold">Semua Tercatat ({t.alihDayaDetail.totalCount})</span>
+                                  )}
+                                </span>
+                              </div>
+                            )}
                           </td>
 
                           {/* POS */}
@@ -1331,83 +1459,126 @@ export const PrognosaView: React.FC = () => {
 
                           {/* Bulan */}
                           <td className="py-3 px-3 text-center">
-                            <select
-                              value={t.month !== undefined ? t.month : selectedMonth}
-                              onChange={(e) => updateAdditionalTransaction(t.id, { month: Number(e.target.value) })}
-                              className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer ${
-                                isCurrent 
-                                  ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold' 
-                                  : 'bg-white border-slate-200 text-slate-600'
-                              }`}
-                              title="Ubah alokasi bulan transaksi"
-                            >
-                              {MONTH_NAMES.map((name, mIdx) => (
-                                <option key={name} value={mIdx}>{name}</option>
-                              ))}
-                            </select>
+                            {t.isFromAlihDaya ? (
+                              <span 
+                                className={`inline-block text-xs px-2 py-1 rounded-md border font-bold ${
+                                  isCurrent 
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                                    : 'bg-slate-100 border-slate-200 text-slate-700'
+                                }`}
+                                title="Bulan alokasi komitmen dihitung otomatis dari termin tagihan kontrak rutin"
+                              >
+                                {MONTH_NAMES[t.month !== undefined ? t.month : selectedMonth]}
+                              </span>
+                            ) : (
+                              <select
+                                value={t.month !== undefined ? t.month : selectedMonth}
+                                onChange={(e) => updateAdditionalTransaction(t.id, { month: Number(e.target.value) })}
+                                className={`text-xs px-2 py-1 rounded-md border font-medium cursor-pointer ${
+                                  isCurrent 
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold' 
+                                    : 'bg-white border-slate-200 text-slate-600'
+                                }`}
+                                title="Ubah alokasi bulan transaksi"
+                              >
+                                {MONTH_NAMES.map((name, mIdx) => (
+                                  <option key={name} value={mIdx}>{name}</option>
+                                ))}
+                              </select>
+                            )}
                           </td>
 
                           {/* Nomor Dokumen / SPJ (Inline Edit) */}
                           <td className="py-2 px-4">
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={t.documentNumber || ''}
-                                placeholder="Ketik No. Dokumen / SPJ..."
-                                onChange={(e) => {
-                                  updateAdditionalTransaction(t.id, { documentNumber: e.target.value });
-                                }}
-                                className={`w-full px-2.5 py-1 text-xs rounded-lg border transition-all focus:outline-none focus:ring-2 ${
-                                  hasDoc 
-                                    ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-mono font-semibold focus:ring-emerald-200' 
-                                    : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:ring-blue-100 focus:border-blue-500'
-                                }`}
-                                title="Jika terisi nomor dokumen, komitmen otomatis dikecualikan dari perhitungan prognosa tambahan"
-                              />
-                              {hasDoc && (
+                            {t.isFromAlihDaya && hasDoc && t.documentNumber?.startsWith('TERCATAT SAP') ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 font-mono">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                  {t.documentNumber}
+                                </span>
                                 <button
                                   type="button"
-                                  onClick={() => updateAdditionalTransaction(t.id, { documentNumber: '' })}
-                                  className="absolute right-1.5 top-1.5 text-slate-400 hover:text-rose-600"
-                                  title="Hapus nomor dokumen (masukkan kembali ke komitmen terbuka)"
+                                  onClick={() => setSelectedAlihDayaItem(t)}
+                                  className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                                  title="Lihat rincian dokumen tagihan"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <Eye className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={t.documentNumber || ''}
+                                  placeholder={t.isFromAlihDaya ? "Ketik No. SPJ / buka rincian..." : "Ketik No. Dokumen / SPJ..."}
+                                  onChange={(e) => {
+                                    updateAdditionalTransaction(t.id, { documentNumber: e.target.value });
+                                  }}
+                                  className={`w-full px-2.5 py-1 text-xs rounded-lg border transition-all focus:outline-none focus:ring-2 ${
+                                    hasDoc 
+                                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-mono font-semibold focus:ring-emerald-200' 
+                                      : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:ring-blue-100 focus:border-blue-500'
+                                  }`}
+                                  title={t.isFromAlihDaya ? "Jika terisi nomor dokumen, seluruh termin kontrak rutin pada pos & bulan ini ditandai tercatat dan dikecualikan dari prognosa" : "Jika terisi nomor dokumen, komitmen otomatis dikecualikan dari perhitungan prognosa tambahan"}
+                                />
+                                {hasDoc && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateAdditionalTransaction(t.id, { documentNumber: '' })}
+                                    className="absolute right-1.5 top-1.5 text-slate-400 hover:text-rose-600"
+                                    title="Hapus nomor dokumen (masukkan kembali ke komitmen terbuka)"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </td>
 
                           {/* Nominal (Inline Edit) - Support Negative/Minus */}
                           <td className="py-2 px-4 text-right">
-                            <div className="flex flex-col items-end gap-0.5">
-                              <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-slate-400 font-semibold">Rp</span>
-                                <input
-                                  type="number"
-                                  value={t.amount === 0 ? '' : t.amount}
-                                  placeholder="0"
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? 0 : Number(e.target.value) || 0;
-                                    updateAdditionalTransaction(t.id, { amount: val });
-                                  }}
-                                  className={`w-32 text-right px-2.5 py-1 text-xs font-mono font-bold border rounded-lg focus:outline-none transition-all ${
-                                    hasDoc 
-                                      ? 'bg-slate-100 border-slate-200 text-slate-500 line-through' 
-                                      : t.amount < 0
-                                      ? 'bg-rose-50 border-rose-300 text-rose-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-100'
-                                      : 'bg-white border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                  }`}
-                                  title="Ketik nominal langsung untuk mengubah (bisa nilai minus)"
-                                />
-                              </div>
-                              {t.amount !== 0 && (
-                                <span className={`text-[10px] font-mono ${
-                                  hasDoc ? 'text-slate-400 line-through' : t.amount < 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'
+                            {t.isFromAlihDaya ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className={`text-xs font-mono font-bold ${
+                                  hasDoc ? 'text-slate-400 line-through' : 'text-slate-900'
                                 }`}>
-                                  {formatRupiahShort(t.amount)}
+                                  {formatRupiah(t.amount)}
                                 </span>
-                              )}
-                            </div>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {hasDoc ? 'Tercatat di SAP (Rp 0)' : `${t.alihDayaDetail?.openCount || 0} tagihan open`}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <div className="flex items-center justify-end gap-1">
+                                  <span className="text-[10px] text-slate-400 font-semibold">Rp</span>
+                                  <input
+                                    type="number"
+                                    value={t.amount === 0 ? '' : t.amount}
+                                    placeholder="0"
+                                    onChange={(e) => {
+                                      const val = e.target.value === '' ? 0 : Number(e.target.value) || 0;
+                                      updateAdditionalTransaction(t.id, { amount: val });
+                                    }}
+                                    className={`w-32 text-right px-2.5 py-1 text-xs font-mono font-bold border rounded-lg focus:outline-none transition-all ${
+                                      hasDoc 
+                                        ? 'bg-slate-100 border-slate-200 text-slate-500 line-through' 
+                                        : t.amount < 0
+                                        ? 'bg-rose-50 border-rose-300 text-rose-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-100'
+                                        : 'bg-white border-slate-300 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                                    }`}
+                                    title="Ketik nominal langsung untuk mengubah (bisa nilai minus)"
+                                  />
+                                </div>
+                                {t.amount !== 0 && (
+                                  <span className={`text-[10px] font-mono ${
+                                    hasDoc ? 'text-slate-400 line-through' : t.amount < 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'
+                                  }`}>
+                                    {formatRupiahShort(t.amount)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
 
                           {/* Status Perhitungan */}
@@ -1443,13 +1614,14 @@ export const PrognosaView: React.FC = () => {
                           <td className="py-3 px-3 text-center">
                             <button
                               type="button"
+                              disabled={t.isFromAlihDaya}
                               onClick={() => updateAdditionalTransaction(t.id, { isActive: !t.isActive })}
                               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
                                 t.isActive 
                                   ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
                                   : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                              }`}
-                              title="Klik untuk mengubah status aktif"
+                              } ${t.isFromAlihDaya ? 'cursor-default opacity-85' : ''}`}
+                              title={t.isFromAlihDaya ? "Status aktif komitmen kontrak rutin sinkron dengan kontrak" : "Klik untuk mengubah status aktif"}
                             >
                               {t.isActive ? 'Aktif' : 'Off'}
                             </button>
@@ -1458,26 +1630,39 @@ export const PrognosaView: React.FC = () => {
                           {/* Aksi */}
                           <td className="py-3 px-3 text-center">
                             <div className="flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setEditingItem(JSON.parse(JSON.stringify(t)))}
-                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Edit Detail Komitmen"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirm(`Hapus tambahan transaksi "${t.name}"?`)) {
-                                    deleteAdditionalTransaction(t.id);
-                                  }
-                                }}
-                                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Hapus Komitmen"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {t.isFromAlihDaya ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedAlihDayaItem(t)}
+                                  className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Lihat & Kelola Rincian Tagihan Kontrak Rutin"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingItem(JSON.parse(JSON.stringify(t)))}
+                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Edit Detail Komitmen"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`Hapus tambahan transaksi "${t.name}"?`)) {
+                                        deleteAdditionalTransaction(t.id);
+                                      }
+                                    }}
+                                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                    title="Hapus Komitmen"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1678,7 +1863,7 @@ export const PrognosaView: React.FC = () => {
                 <input
                   type="text"
                   value={formData.category}
-                  placeholder="Contoh: PEKERJAAN ALIH DAYA"
+                  placeholder="Contoh: PEKERJAAN KONTRAK RUTIN"
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
                 />
@@ -1774,7 +1959,7 @@ export const PrognosaView: React.FC = () => {
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-base">
                 <Edit3 className="w-5 h-5 text-blue-600" />
-                <h3>Edit Komitmen Transaksi / Alih Daya</h3>
+                <h3>Edit Komitmen Transaksi / Kontrak Rutin</h3>
               </div>
               <button
                 type="button"
@@ -1994,6 +2179,15 @@ export const PrognosaView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL RINCIAN TAGIHAN ALIH DAYA */}
+      <AlihDayaCommitmentDetailModal
+        isOpen={Boolean(activeAlihDayaItem)}
+        onClose={() => setSelectedAlihDayaItem(null)}
+        transaction={activeAlihDayaItem}
+        onUpdateTerminDocNumber={quickUpdateTerminDocNumber}
+        onNavigateToAlihDaya={onNavigateTab ? () => onNavigateTab('alih_daya') : undefined}
+      />
     </div>
   );
 };

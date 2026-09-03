@@ -70,7 +70,7 @@ function MainApp() {
       case 'performance':
         return <PerformanceView />;
       case 'prognosa':
-        return <PrognosaView />;
+        return <PrognosaView onNavigateTab={setActiveTab} />;
       case 'reports':
         return <ReportsView />;
       case 'user_management':

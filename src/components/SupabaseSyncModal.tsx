@@ -132,7 +132,7 @@ export const SupabaseSyncModal: React.FC<SupabaseSyncModalProps> = ({ isOpen, on
                 {loadingAction === 'upload' && <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" />}
               </div>
               <p className="text-[11px] text-slate-500">
-                Kirim seluruh data anggaran & alih daya saat ini ke tabel Supabase.
+                Kirim seluruh data anggaran & kontrak rutin saat ini ke tabel Supabase.
               </p>
             </button>
 

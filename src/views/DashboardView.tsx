@@ -242,7 +242,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </h1>
             <p className="text-sm text-slate-300 mt-1 max-w-2xl">
               Pemantauan terintegrasi antara pagu SKKO, realisasi penyerapan anggaran (SAP), 
-              serta komitmen alih daya hingga periode <span className="font-semibold text-blue-300">{MONTH_NAMES[selectedMonth]} {selectedYear}</span>.
+              serta komitmen kontrak rutin hingga periode <span className="font-semibold text-blue-300">{MONTH_NAMES[selectedMonth]} {selectedYear}</span>.
             </p>
           </div>
 
@@ -765,7 +765,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       </div>
 
-      {/* Monitoring Alih Daya Quick Section */}
+      {/* Monitoring Kontrak Rutin Quick Section */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-xl p-5 text-white shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
@@ -774,7 +774,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </div>
             <div>
               <h3 className="font-bold text-base text-white flex items-center gap-2">
-                <span>Monitoring Alih Daya (Outsourcing)</span>
+                <span>Monitoring Kontrak Rutin</span>
                 <span className="text-[11px] bg-blue-500/30 text-blue-200 border border-blue-400/40 px-2 py-0.5 rounded-full font-semibold">
                   {alihDayaSummary.countContracts} Kontrak
                 </span>
@@ -789,7 +789,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               onClick={() => onNavigateTab('alih_daya')}
               className="text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto shadow-xs cursor-pointer"
             >
-              <span>Buka Monitoring Alih Daya</span>
+              <span>Buka Monitoring Kontrak Rutin</span>
               <ArrowUpRight className="w-4 h-4" />
             </button>
           )}

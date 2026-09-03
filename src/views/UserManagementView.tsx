@@ -719,7 +719,7 @@ export const UserManagementView: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-600 mt-1 pl-5">
-                      Bisa akses semua modul (Dashboard, Input Anggaran, Realisasi, Import, Prognosa, Matriks, Alih Daya, Indikator, Laporan &amp; Manajemen User).
+                      Bisa akses semua modul (Dashboard, Input Anggaran, Realisasi, Import, Prognosa, Matriks, Kontrak Rutin, Indikator, Laporan &amp; Manajemen User).
                     </p>
                   </label>
 

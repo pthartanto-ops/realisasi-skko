@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   BudgetItem, 
   IndicatorTarget, 
@@ -19,6 +19,7 @@ import { DEFAULT_USERS } from '../data/defaultUsers';
 import { recalculateBudgetSubtotals, getChildAccountsForHeader } from '../utils/budgetCalculations';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { fetchRemoteState, saveRemoteState, AppDataPayload } from '../services/supabaseStorage';
+import { generateAlihDayaMonthlyCommitments } from '../utils/alihDayaCommitmentUtils';
 
 interface AppContextType {
   budgetItems: BudgetItem[];
@@ -374,11 +375,18 @@ const loadYearDataset = (year: number): YearDataset => {
     try {
       const parsed = JSON.parse(savedTx);
       if (Array.isArray(parsed)) {
-        additionalTransactions = parsed.map(normalizeTransaction);
+        const dummyIds = new Set(['add_1', 'add_2', 'add_3', 'add_4', 'add_5', 'add_6', 'add_7', 'add_8']);
+        additionalTransactions = parsed
+          .filter((t: any) => !t.isFromAlihDaya && !t.id?.startsWith('komitmen_ad_') && !dummyIds.has(t.id))
+          .map(normalizeTransaction);
       }
     } catch (e) {
       console.error(`Gagal memuat transaksi tahun ${year}`, e);
     }
+  } else {
+    const dummyIds = new Set(['add_1', 'add_2', 'add_3', 'add_4', 'add_5', 'add_6', 'add_7', 'add_8']);
+    additionalTransactions = (defaultDataset.additionalTransactions || [])
+      .filter((t: any) => !t.isFromAlihDaya && !t.id?.startsWith('komitmen_ad_') && !dummyIds.has(t.id));
   }
 
   if (savedAD) {
@@ -459,10 +467,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(initialData.budgetItems);
   const [indicators, setIndicators] = useState<IndicatorTarget[]>(initialData.indicators);
-  const [additionalTransactions, setAdditionalTransactions] = useState<AdditionalTransaction[]>(initialData.additionalTransactions);
+  const [additionalTransactions, setAdditionalTransactions] = useState<AdditionalTransaction[]>(() => {
+    const dummyIds = new Set(['add_1', 'add_2', 'add_3', 'add_4', 'add_5', 'add_6', 'add_7', 'add_8']);
+    return (initialData.additionalTransactions || [])
+      .filter(t => !t.isFromAlihDaya && !t.id?.startsWith('komitmen_ad_') && !dummyIds.has(t.id));
+  });
   const [alihDayaContracts, setAlihDayaContracts] = useState<AlihDayaContract[]>(initialData.alihDayaContracts);
   const [importLogs, setImportLogs] = useState<ImportLog[]>(initialData.importLogs);
   const [selectedMonth, setSelectedMonth] = useState<number>(initialYear < 2026 ? 11 : 7);
+
+  // Menghasilkan komitmen bulanan otomatis dari Kontrak & Termin Alih Daya
+  // Mengikuti data alih daya: yang open masuk komitmen bulanan per pos,
+  // bila sudah tidak open (lengkap dokumen / tercatat) tidak diperhitungkan di prognosa.
+  const alihDayaMonthlyCommitments = useMemo(() => {
+    return generateAlihDayaMonthlyCommitments(alihDayaContracts, selectedYear);
+  }, [alihDayaContracts, selectedYear]);
+
+  // Gabungkan transaksi komitmen manual dengan komitmen bulanan Alih Daya
+  const mergedAdditionalTransactions = useMemo(() => {
+    const dummyIds = new Set(['add_1', 'add_2', 'add_3', 'add_4', 'add_5', 'add_6', 'add_7', 'add_8']);
+    const cleanManual = additionalTransactions.filter(t => 
+      !t.isFromAlihDaya && 
+      !t.id.startsWith('komitmen_ad_') && 
+      !dummyIds.has(t.id)
+    );
+    return [...cleanManual, ...alihDayaMonthlyCommitments];
+  }, [additionalTransactions, alihDayaMonthlyCommitments]);
 
   // Handler pergantian tahun anggaran dengan persistensi otomatis per tahun
   const setSelectedYear = useCallback((targetYear: number) => {
@@ -1172,10 +1202,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateAdditionalTransaction = (id: string, updated: Partial<AdditionalTransaction>) => {
+    // Jika komitmen berasal dari akumulasi bulanan Alih Daya
+    if (id.startsWith('komitmen_ad_')) {
+      if (updated.documentNumber !== undefined) {
+        const docNum = (updated.documentNumber || '').trim();
+        const statusBeban: StatusBeban = docNum !== '' ? 'Tercatat' : 'Belum Tercatat';
+        const match = id.match(/^komitmen_ad_(.+)_m(\d+)$/);
+        if (match) {
+          const rawPos = match[1].replace(/_/g, ' ');
+          const month = parseInt(match[2], 10);
+
+          setAlihDayaContracts(prev => prev.map(c => {
+            const cPos = (c.posAnggaran || c.posType || 'Pos 53') as string;
+            const posMatches = cPos === rawPos || (rawPos === 'Beban Sewa' && cPos === 'Sewa Non AHG');
+            if (!posMatches) return c;
+
+            return {
+              ...c,
+              termins: c.termins.map(t => {
+                const tPos = (t.posType || cPos) as string;
+                const tMonth = t.bulanIndex !== undefined ? t.bulanIndex : 0;
+                const matches = (tPos === rawPos || (rawPos === 'Beban Sewa' && tPos === 'Sewa Non AHG')) && tMonth === month;
+                if (matches) {
+                  return {
+                    ...t,
+                    documentNumber: docNum,
+                    statusBeban
+                  };
+                }
+                return t;
+              })
+            };
+          }));
+        }
+      }
+      return;
+    }
+
     setAdditionalTransactions(prev => prev.map(tx => tx.id === id ? { ...tx, ...updated } : tx));
   };
 
   const deleteAdditionalTransaction = (id: string) => {
+    if (id.startsWith('komitmen_ad_')) {
+      return;
+    }
     setAdditionalTransactions(prev => prev.filter(tx => tx.id !== id));
   };
 
@@ -1544,7 +1614,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       year: selectedYear,
       budgetItems,
       indicators,
-      additionalTransactions,
+      additionalTransactions: mergedAdditionalTransactions,
       alihDayaContracts,
       users,
       exportedAt: new Date().toISOString()
@@ -1563,7 +1633,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         budgetItems,
         indicators,
-        additionalTransactions,
+        additionalTransactions: mergedAdditionalTransactions,
         alihDayaContracts,
         importLogs,
         selectedYear,

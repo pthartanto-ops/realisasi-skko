@@ -71,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   // All available nav items
   const allNavItems: { id: ActiveTab; label: string; icon: React.FC<{ className?: string }>; badge?: string }[] = [
     { id: 'dashboard', label: 'Dashboard Utama', icon: LayoutDashboard },
-    { id: 'alih_daya', label: 'Monitoring Alih Daya', icon: Briefcase, badge: `${alihDayaContracts.length}` },
+    { id: 'alih_daya', label: 'Monitoring Kontrak Rutin', icon: Briefcase, badge: `${alihDayaContracts.length}` },
     { id: 'prognosa', label: 'Prognosa Anggaran', icon: Calculator },
     { id: 'budget_input', label: 'Input & Edit Anggaran', icon: FileEdit, badge: `${budgetItems.filter(i => !i.isGroupHeader).length}` },
     { id: 'realization_input', label: 'Input Realisasi Manual', icon: Receipt, badge: 'Manual' },
@@ -316,7 +316,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                 className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
               >
                 <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden md:inline">Ganti Akun / Logout</span>
+                <span className="hidden md:inline">Logout</span>
               </button>
             </div>
           </div>

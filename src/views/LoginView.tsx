@@ -88,7 +88,7 @@ export const LoginView: React.FC = () => {
           </h1>
 
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-lg">
-            Aplikasi terpadu untuk pengendalian anggaran, realisasi bulanan, prognosa akhir tahun, monitoring kontrak alih daya, serta evaluasi indikator kinerja keuangan.
+            Aplikasi terpadu untuk pengendalian anggaran, realisasi bulanan, prognosa akhir tahun, monitoring kontrak rutin, serta evaluasi indikator kinerja keuangan.
           </p>
         </div>
 
