@@ -14,8 +14,6 @@ import {
   Briefcase,
   Database,
   Users,
-  ShieldCheck,
-  UserCheck,
   ChevronDown,
   User,
   LogOut
@@ -274,17 +272,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                         }`}>
                           {roleConfig.label}
                         </span>
-                      </div>
-                    </div>
-
-                    {/* Security Notice: Ganti Akun melalui Login & Logout */}
-                    <div className="px-4 py-3 bg-slate-50/90 border-y border-slate-100 text-xs text-slate-600">
-                      <div className="flex items-start gap-2.5">
-                        <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                        <div className="text-[11px] leading-relaxed text-slate-600">
-                          <strong className="text-slate-800 block mb-0.5">Ketentuan Ganti Akun:</strong>
-                          Pergantian akun hanya dapat dilakukan dengan <strong>Logout</strong> dari akun saat ini, kemudian melakukan <strong>Login</strong> menggunakan NIP dan Password akun tujuan.
-                        </div>
                       </div>
                     </div>
 
