@@ -85,14 +85,9 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                  Pemantauan Realisasi Anggaran
-                </h1>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                  SKKO / RKAP
-                </span>
-              </div>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+                Pemantauan Realisasi Anggaran
+              </h1>
               <p className="text-xs text-slate-400">
                 Dashboard Monitoring, Input Anggaran Manual & Import Realisasi Excel
               </p>

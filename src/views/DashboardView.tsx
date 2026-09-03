@@ -19,7 +19,8 @@ import {
   Receipt,
   FileSpreadsheet,
   FileEdit,
-  TableProperties
+  TableProperties,
+  Target
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -378,6 +379,124 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
         </div>
       </div>
 
+      {/* Indikator Kinerja Utama (Optimalisasi Biaya) Section */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
+              <Target className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-slate-900">
+                Indikator Kinerja Utama (Optimalisasi Biaya)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Pencapaian target indikator efisiensi dan optimalisasi per pos s/d {MONTH_NAMES[selectedMonth]} {selectedYear}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigateTab('performance')}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <span>Lihat Analisis Indikator</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {indicators.map((ind) => {
+            const currentPct = ind.monthlyPercentage[selectedMonth] || 0;
+            const currentReal = ind.monthlyRealization[selectedMonth] || 0;
+            const currentTarget = ind.monthlyTarget[selectedMonth] || 0;
+            const deviasi = currentReal - currentTarget;
+            const statusInfo = getPerformanceStatus(currentPct);
+
+            const getIndIcon = (code: string) => {
+              if (code.includes('53')) return Wrench;
+              if (code.includes('54')) return Building;
+              if (code.includes('52')) return Briefcase;
+              return Car;
+            };
+            const IndIcon = getIndIcon(ind.code || ind.id);
+
+            return (
+              <div 
+                key={ind.id} 
+                className="bg-slate-50/70 hover:bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-blue-300 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between"
+              >
+                <div>
+                  {/* Category & Status Badge Row */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+                        <IndIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide truncate">
+                        {ind.posType || ind.pos}
+                      </span>
+                    </div>
+
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 whitespace-nowrap ${statusInfo.badgeClass}`}>
+                      {statusInfo.status === 'optimal' && <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />}
+                      {statusInfo.status === 'overbudget' && <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />}
+                      {statusInfo.status === 'kurang_optimal' && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
+                      {statusInfo.status === 'bermasalah' && <AlertOctagon className="w-3 h-3 text-red-600 shrink-0" />}
+                      <span>{statusInfo.label}</span>
+                    </span>
+                  </div>
+
+                  {/* Indicator Title: clean 2-line wrapped text, never cut off */}
+                  <h4 className="text-xs font-bold text-slate-900 leading-snug min-h-[2.5rem] flex items-center" title={ind.name}>
+                    {ind.name}
+                  </h4>
+
+                  {/* Percentage Metric & Target Chip */}
+                  <div className="flex items-baseline justify-between mt-3 mb-2">
+                    <div className={`text-2xl font-black font-mono tracking-tight ${statusInfo.textClass}`}>
+                      {formatPercent(currentPct)}
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                      Opt: 95-100%
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden mb-3">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        statusInfo.status === 'optimal' ? 'bg-emerald-500' :
+                        statusInfo.status === 'overbudget' ? 'bg-rose-500' :
+                        statusInfo.status === 'kurang_optimal' ? 'bg-amber-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, currentPct))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Realisasi vs Target SKKO Breakdown */}
+                <div className="pt-2.5 border-t border-slate-200/70 text-[11px] space-y-1.5 text-slate-600">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Realisasi:</span>
+                    <span className="font-bold text-slate-800">{formatRupiahShort(currentReal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Target SKKO:</span>
+                    <span className="font-semibold text-slate-700">{formatRupiahShort(currentTarget)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-[10px]">
+                    <span className="text-slate-400">Deviasi:</span>
+                    <span className={`font-semibold font-mono ${deviasi <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {deviasi > 0 ? '+' : ''}{formatRupiahShort(deviasi)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Quick Action Navigation Bar */}
       <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -689,65 +808,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
               Otomatis tersinkronisasi
             </span>
           </div>
-        </div>
-      </div>
-
-      {/* Indikator Kinerja & Optimalisasi Card Section */}
-      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-          <div>
-            <h3 className="font-bold text-base text-slate-900">Indikator Kinerja Utama (Optimalisasi Biaya)</h3>
-            <p className="text-xs text-slate-500">Pencapaian target indikator efisiensi dan optimalisasi per pos s/d {MONTH_NAMES[selectedMonth]}</p>
-          </div>
-          <button
-            onClick={() => onNavigateTab('performance')}
-            className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 self-start sm:self-auto"
-          >
-            Lihat Analisis Indikator <ArrowUpRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {indicators.map((ind) => {
-            const currentPct = ind.monthlyPercentage[selectedMonth] || 0;
-            const currentReal = ind.monthlyRealization[selectedMonth] || 0;
-            const currentTarget = ind.monthlyTarget[selectedMonth] || 0;
-
-            const statusInfo = getPerformanceStatus(currentPct);
-
-            return (
-              <div key={ind.id} className="bg-slate-50 rounded-xl p-4 border border-slate-200/80 hover:border-slate-300 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-700 truncate">{ind.name}</span>
-                  <span className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${statusInfo.badgeClass}`}>
-                    {statusInfo.status === 'optimal' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
-                    {statusInfo.status === 'overbudget' && <AlertCircle className="w-3 h-3 text-rose-600" />}
-                    {statusInfo.status === 'kurang_optimal' && <AlertTriangle className="w-3 h-3 text-amber-600" />}
-                    {statusInfo.status === 'bermasalah' && <AlertOctagon className="w-3 h-3 text-red-600" />}
-                    <span>{statusInfo.label}</span>
-                  </span>
-                </div>
-
-                <div className="flex items-baseline justify-between mt-2">
-                  <div className={`text-2xl font-extrabold ${statusInfo.textClass}`}>
-                    {formatPercent(currentPct)}
-                  </div>
-                  <span className="text-[11px] text-slate-500 font-medium">Opt: 95-100%</span>
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-slate-200/60 text-[11px] space-y-1 text-slate-600">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Realisasi:</span>
-                    <span className="font-semibold">{formatRupiahShort(currentReal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Target SKKO:</span>
-                    <span className="font-semibold">{formatRupiahShort(currentTarget)}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
