@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { BudgetItem, IndicatorTarget, AdditionalTransaction, ImportLog, PosType, AlihDayaContract, AlihDayaTermin, StatusBeban } from '../types';
 import { DEFAULT_BUDGET_ITEMS, DEFAULT_INDICATORS, DEFAULT_ADDITIONAL_TRANSACTIONS, DEFAULT_ALIH_DAYA_CONTRACTS } from '../data/defaultBudgetData';
 import { recalculateBudgetSubtotals, getChildAccountsForHeader } from '../utils/budgetCalculations';
+import { isSupabaseConfigured } from '../services/supabaseClient';
+import { fetchRemoteState, saveRemoteState, AppDataPayload } from '../services/supabaseStorage';
 
 interface AppContextType {
   budgetItems: BudgetItem[];
@@ -13,6 +15,13 @@ interface AppContextType {
   selectedMonth: number; // 0 for Jan, 7 for Aug, 11 for Dec
   setSelectedYear: (year: number) => void;
   setSelectedMonth: (month: number) => void;
+  
+  // Supabase sync states & actions
+  isSupabaseEnabled: boolean;
+  supabaseSyncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSyncTime: Date | null;
+  syncToSupabase: () => Promise<{ success: boolean; error?: string }>;
+  loadFromSupabase: () => Promise<{ success: boolean; error?: string }>;
   
   // Budget operations
   addBudgetItem: (item: Omit<BudgetItem, 'id'>) => void;
@@ -339,6 +348,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(7); // Default to August (0-indexed = 7)
 
+  // Supabase sync states
+  const [isSupabaseEnabled] = useState<boolean>(() => isSupabaseConfigured());
+  const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const isInitialRemoteLoadDone = useRef(false);
+  const isSyncingRef = useRef(false);
+
+  // Manual / programmatic sync to Supabase
+  const syncToSupabase = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Supabase belum dikonfigurasi. Harap atur VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di environment variables.' };
+    }
+    setSupabaseSyncStatus('syncing');
+    isSyncingRef.current = true;
+    const payload: AppDataPayload = {
+      budgetItems,
+      indicators,
+      additionalTransactions,
+      alihDayaContracts,
+      importLogs,
+      selectedYear,
+      selectedMonth
+    };
+    const res = await saveRemoteState(payload);
+    isSyncingRef.current = false;
+    if (res.success) {
+      setSupabaseSyncStatus('synced');
+      setLastSyncTime(new Date());
+      return { success: true };
+    } else {
+      setSupabaseSyncStatus('error');
+      return { success: false, error: res.error };
+    }
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, selectedYear, selectedMonth]);
+
+  // Load latest state from Supabase
+  const loadFromSupabase = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Supabase belum dikonfigurasi.' };
+    }
+    setSupabaseSyncStatus('syncing');
+    const remote = await fetchRemoteState();
+    if (remote) {
+      if (Array.isArray(remote.budgetItems) && remote.budgetItems.length > 0) {
+        setBudgetItems(recalculateBudgetSubtotals(remote.budgetItems));
+      }
+      if (Array.isArray(remote.indicators) && remote.indicators.length > 0) {
+        setIndicators(remote.indicators);
+      }
+      if (Array.isArray(remote.additionalTransactions)) {
+        setAdditionalTransactions(remote.additionalTransactions);
+      }
+      if (Array.isArray(remote.alihDayaContracts)) {
+        setAlihDayaContracts(remote.alihDayaContracts.map(normalizeContract));
+      }
+      if (Array.isArray(remote.importLogs)) {
+        setImportLogs(remote.importLogs);
+      }
+      if (remote.selectedYear) setSelectedYear(remote.selectedYear);
+      if (remote.selectedMonth !== undefined) setSelectedMonth(remote.selectedMonth);
+
+      setSupabaseSyncStatus('synced');
+      setLastSyncTime(new Date());
+      return { success: true };
+    } else {
+      setSupabaseSyncStatus('idle');
+      return { success: false, error: 'Tidak ditemukan data di database Supabase atau tabel belum dibuat.' };
+    }
+  }, []);
+
+  // Initial load from Supabase on startup if configured
+  useEffect(() => {
+    if (isSupabaseConfigured() && !isInitialRemoteLoadDone.current) {
+      isInitialRemoteLoadDone.current = true;
+      loadFromSupabase();
+    }
+  }, [loadFromSupabase]);
+
   // Save changes to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_BUDGET, JSON.stringify(budgetItems));
@@ -359,6 +446,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(importLogs));
   }, [importLogs]);
+
+  // Debounced auto-save to Supabase when data changes
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !isInitialRemoteLoadDone.current) return;
+    const timer = setTimeout(() => {
+      syncToSupabase();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, selectedYear, selectedMonth, syncToSupabase]);
 
   // Recalculate indicators dynamically when budget or realization changes
   // Target SKKO dihitung dari penjumlahan sub akun anggaran bulanan secara kumulatif
@@ -1121,6 +1217,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedMonth,
         setSelectedYear,
         setSelectedMonth,
+        isSupabaseEnabled,
+        supabaseSyncStatus,
+        lastSyncTime,
+        syncToSupabase,
+        loadFromSupabase,
         addBudgetItem,
         updateBudgetItem,
         deleteBudgetItem,

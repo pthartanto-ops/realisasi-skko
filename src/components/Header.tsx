@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Building2, 
   Calendar, 
@@ -13,12 +13,14 @@ import {
   Target, 
   Calculator, 
   FileText,
-  Briefcase
+  Briefcase,
+  Database
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { MONTH_NAMES, formatRupiahShort, formatPercent } from '../utils/formatters';
 import { exportFullReportToExcel } from '../utils/excelExporter';
 import { ActiveTab } from '../types';
+import { SupabaseSyncModal } from './SupabaseSyncModal';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -35,8 +37,12 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     selectedMonth, 
     setSelectedYear, 
     setSelectedMonth, 
-    resetToDefault 
+    resetToDefault,
+    isSupabaseEnabled,
+    supabaseSyncStatus
   } = useApp();
+
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
   const totalBudget = budgetItems
     .filter(i => !i.isGroupHeader)
@@ -152,6 +158,26 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             {/* Actions */}
             <div className="flex items-center gap-2">
               <button
+                id="btn-supabase-sync"
+                onClick={() => setIsSupabaseModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer border ${
+                  isSupabaseEnabled
+                    ? supabaseSyncStatus === 'syncing'
+                      ? 'bg-amber-600/30 text-amber-300 border-amber-500/40 animate-pulse'
+                      : supabaseSyncStatus === 'error'
+                      ? 'bg-red-900/30 text-red-300 border-red-500/40'
+                      : 'bg-emerald-950/60 text-emerald-300 hover:bg-emerald-900/70 border-emerald-500/40'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                }`}
+                title="Status & Pengaturan Database Cloud Supabase"
+              >
+                <Database className={`w-3.5 h-3.5 ${isSupabaseEnabled ? 'text-emerald-400' : 'text-slate-400'}`} />
+                <span className="hidden lg:inline">
+                  {isSupabaseEnabled ? (supabaseSyncStatus === 'syncing' ? 'Menyimpan...' : 'Supabase DB') : 'Setup Supabase'}
+                </span>
+              </button>
+
+              <button
                 id="btn-export-header-excel"
                 onClick={handleExport}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
@@ -211,6 +237,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
           })}
         </div>
       </div>
+
+      <SupabaseSyncModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+      />
     </header>
   );
 };
