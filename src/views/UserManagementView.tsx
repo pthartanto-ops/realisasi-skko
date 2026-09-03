@@ -34,7 +34,6 @@ export const UserManagementView: React.FC = () => {
     addUser, 
     updateUser, 
     deleteUser, 
-    switchUser,
     logoutUser
   } = useApp();
 
@@ -66,6 +65,9 @@ export const UserManagementView: React.FC = () => {
 
   // Delete modal state
   const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
+
+  // Switch account via logout confirmation modal state
+  const [accountToSwitch, setAccountToSwitch] = useState<AppUser | null>(null);
 
   // Success notification banner
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -509,7 +511,7 @@ export const UserManagementView: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Sesi Status / Quick Switch */}
+                      {/* Sesi Status / Ganti Akun */}
                       <td className="py-3.5 px-4">
                         {isCurrent ? (
                           <div className="flex items-center gap-2">
@@ -530,17 +532,19 @@ export const UserManagementView: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => {
-                              switchUser(u.id);
-                              showNotification('success', `Berhasil beralih ke akun "${u.nama}" (${ROLE_PERMISSIONS[u.role].label}).`);
-                            }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-blue-700 bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
-                            title="Gunakan akun ini untuk melihat aplikasi dari perspektif role ini"
-                          >
-                            <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Gunakan Akun Ini</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                              Tidak Aktif
+                            </span>
+                            <button
+                              onClick={() => setAccountToSwitch(u)}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-blue-700 bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+                              title={`Keluar dan login sebagai ${u.nama}`}
+                            >
+                              <LogOut className="w-3 h-3 text-slate-500" />
+                              <span>Ganti Akun</span>
+                            </button>
+                          </div>
                         )}
                       </td>
 
@@ -834,6 +838,48 @@ export const UserManagementView: React.FC = () => {
                 className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-sm transition-colors cursor-pointer"
               >
                 Ya, Hapus Pengguna
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Ganti Akun via Logout & Login */}
+      {accountToSwitch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 p-6 space-y-4">
+            <div className="flex items-center gap-3 text-blue-600">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                <LogOut className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Ganti Akun Pengguna</h3>
+                <p className="text-xs text-slate-500">Perlu Logout &amp; Login</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Untuk berganti ke akun <strong>{accountToSwitch.nama}</strong> ({accountToSwitch.jabatan}), Anda harus keluar dari sesi saat ini terlebih dahulu, lalu melakukan login dengan NIP <strong className="font-mono text-slate-800">{accountToSwitch.nip}</strong> beserta Password akun tersebut.
+            </p>
+
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setAccountToSwitch(null)}
+                className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountToSwitch(null);
+                  logoutUser();
+                }}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Keluar &amp; Menuju Login</span>
               </button>
             </div>
           </div>

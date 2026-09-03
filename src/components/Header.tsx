@@ -46,7 +46,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     supabaseSyncStatus,
     users,
     currentUser,
-    switchUser,
     logoutUser,
     canAccessTab
   } = useApp();
@@ -67,21 +66,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-
   const handleExport = () => {
     exportFullReportToExcel(budgetItems, indicators, additionalTransactions, selectedYear, selectedMonth + 1);
-  };
-
-  const handleSwitchUser = (userId: string) => {
-    const target = users.find(u => u.id === userId);
-    if (!target) return;
-    switchUser(userId);
-    // If target user cannot access the current active tab, switch to dashboard
-    const targetAllowed = ROLE_PERMISSIONS[target.role]?.allowedTabs || [];
-    if (!targetAllowed.includes(activeTab)) {
-      setActiveTab('dashboard');
-    }
-    setIsUserMenuOpen(false);
   };
 
   // All available nav items
@@ -291,47 +277,19 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                       </div>
                     </div>
 
-                    {/* Role simulation switcher */}
-                    <div className="px-3 py-2">
-                      <span className="text-[11px] font-bold text-slate-500 block px-1 mb-1.5 uppercase tracking-wider">
-                        Ganti Pengguna / Simulasi Role:
-                      </span>
-                      <div className="space-y-1">
-                        {users.map(u => {
-                          const isSelected = u.id === currentUser.id;
-                          return (
-                            <button
-                              key={u.id}
-                              onClick={() => handleSwitchUser(u.id)}
-                              className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-colors cursor-pointer ${
-                                isSelected 
-                                  ? 'bg-blue-50 text-blue-800 font-bold border border-blue-200' 
-                                  : 'hover:bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              <div className="truncate pr-2">
-                                <span className="block truncate leading-tight">{u.nama}</span>
-                                <span className="text-[10px] text-slate-500 block font-normal truncate">
-                                  {u.jabatan}
-                                </span>
-                              </div>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold shrink-0 uppercase ${
-                                u.role === 'admin'
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : u.role === 'management'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                {ROLE_PERMISSIONS[u.role]?.label || u.role}
-                              </span>
-                            </button>
-                          );
-                        })}
+                    {/* Security Notice: Ganti Akun melalui Login & Logout */}
+                    <div className="px-4 py-3 bg-slate-50/90 border-y border-slate-100 text-xs text-slate-600">
+                      <div className="flex items-start gap-2.5">
+                        <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <div className="text-[11px] leading-relaxed text-slate-600">
+                          <strong className="text-slate-800 block mb-0.5">Ketentuan Ganti Akun:</strong>
+                          Pergantian akun hanya dapat dilakukan dengan <strong>Logout</strong> dari akun saat ini, kemudian melakukan <strong>Login</strong> menggunakan NIP dan Password akun tujuan.
+                        </div>
                       </div>
                     </div>
 
                     {/* Shortcuts & Logout */}
-                    <div className="pt-2 px-3 border-t border-slate-100 space-y-1.5">
+                    <div className="p-3 space-y-2">
                       {canAccessTab('user_management') && (
                         <button
                           onClick={() => {
@@ -351,10 +309,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                           setIsUserMenuOpen(false);
                           setIsLogoutModalOpen(true);
                         }}
-                        className="w-full px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                       >
-                        <LogOut className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Keluar / Logout</span>
+                        <LogOut className="w-4 h-4 text-rose-600" />
+                        <span>Keluar / Ganti Akun</span>
                       </button>
                     </div>
                   </div>
@@ -367,11 +325,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                 onClick={() => {
                   setIsLogoutModalOpen(true);
                 }}
-                title={`Keluar / Logout dari ${currentUser.nama}`}
+                title={`Keluar / Ganti Akun dari ${currentUser.nama}`}
                 className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
               >
                 <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden md:inline">Logout</span>
+                <span className="hidden md:inline">Ganti Akun / Logout</span>
               </button>
             </div>
           </div>
@@ -424,10 +382,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               <LogOut className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 mb-1">
-              Konfirmasi Keluar Sistem
+              Konfirmasi Keluar &amp; Ganti Akun
             </h3>
             <p className="text-xs text-slate-600 mb-6 leading-relaxed">
-              Apakah Anda yakin ingin keluar dari akun <strong className="text-slate-900">{currentUser.nama}</strong> ({currentUser.jabatan})? Sesi Anda akan diakhiri dan dialihkan kembali ke layar login NIP.
+              Untuk berganti akun atau mengakhiri sesi kerja, Anda perlu keluar dari akun <strong className="text-slate-900">{currentUser.nama}</strong> ({currentUser.jabatan}) terlebih dahulu. Anda akan dialihkan ke layar login untuk memasukkan NIP &amp; Password akun yang ingin digunakan.
             </p>
             <div className="flex items-center justify-end gap-2.5">
               <button
@@ -448,7 +406,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Ya, Keluar Sekarang</span>
+                <span>Ya, Keluar &amp; Menuju Login</span>
               </button>
             </div>
           </div>

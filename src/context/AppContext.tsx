@@ -39,7 +39,6 @@ interface AppContextType {
   addUser: (user: Omit<AppUser, 'id' | 'createdAt'>) => { success: boolean; message?: string };
   updateUser: (id: string, updated: Partial<AppUser>) => { success: boolean; message?: string };
   deleteUser: (id: string) => { success: boolean; message?: string };
-  switchUser: (userId: string) => void;
   loginUser: (nip: string, password: string) => { success: boolean; message?: string };
   logoutUser: () => void;
   canAccessTab: (tab: ActiveTab) => boolean;
@@ -1513,13 +1512,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   }, [users, currentUser]);
 
-  const switchUser = useCallback((userId: string) => {
-    const target = users.find(u => u.id === userId);
-    if (target) {
-      setCurrentUser(target);
-    }
-  }, [users]);
-
   const loginUser = useCallback((nip: string, password: string): { success: boolean; message?: string } => {
     const trimmedNip = nip.trim();
     if (!trimmedNip) {
@@ -1585,7 +1577,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addUser,
         updateUser,
         deleteUser,
-        switchUser,
         loginUser,
         logoutUser,
         canAccessTab,
