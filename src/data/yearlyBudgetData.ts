@@ -94,7 +94,7 @@ export function generateDefaultYearDataset(year: number): YearDataset {
 
     const alihDayaContracts2025: AlihDayaContract[] = DEFAULT_ALIH_DAYA_CONTRACTS.map(contract => {
       const contractId = `${contract.id}_2025`;
-      const nomerKontrak2025 = (contract.nomerKontrak || '').replace('/2026', '/2025');
+      const nomorKontrak2025 = (contract.nomorKontrak || '').replace('/2026', '/2025');
 
       const termins2025: AlihDayaTermin[] = (contract.termins || []).map((t, idx) => {
         const nominal = Math.round((t.nominalTagihan || t.amount || 0) * 0.942);
@@ -119,7 +119,7 @@ export function generateDefaultYearDataset(year: number): YearDataset {
       return {
         ...contract,
         id: contractId,
-        nomerKontrak: nomerKontrak2025,
+        nomorKontrak: nomorKontrak2025,
         tahun: 2025,
         tahunAnggaran: 2025,
         periodeAwal: '2025-01-01',
@@ -194,7 +194,7 @@ export function generateDefaultYearDataset(year: number): YearDataset {
 
     const alihDayaContracts2024: AlihDayaContract[] = DEFAULT_ALIH_DAYA_CONTRACTS.map(contract => {
       const contractId = `${contract.id}_2024`;
-      const nomerKontrak2024 = (contract.nomerKontrak || '').replace('/2026', '/2024');
+      const nomorKontrak2024 = (contract.nomorKontrak || '').replace('/2026', '/2024');
 
       const termins2024: AlihDayaTermin[] = (contract.termins || []).map((t, idx) => {
         const nominal = Math.round((t.nominalTagihan || t.amount || 0) * 0.885);
@@ -219,7 +219,7 @@ export function generateDefaultYearDataset(year: number): YearDataset {
       return {
         ...contract,
         id: contractId,
-        nomerKontrak: nomerKontrak2024,
+        nomorKontrak: nomorKontrak2024,
         tahun: 2024,
         tahunAnggaran: 2024,
         periodeAwal: '2024-01-01',
@@ -282,7 +282,7 @@ export function generateDefaultYearDataset(year: number): YearDataset {
 
   const alihDayaContractsFuture: AlihDayaContract[] = DEFAULT_ALIH_DAYA_CONTRACTS.map(contract => {
     const contractId = `${contract.id}_${year}`;
-    const nomerKontrak = (contract.nomerKontrak || '').replace('/2026', `/${year}`);
+    const nomorKontrak = (contract.nomorKontrak || '').replace('/2026', `/${year}`);
 
     const termins: AlihDayaTermin[] = (contract.termins || []).map((t, idx) => {
       const growth = 1.05;
@@ -307,7 +307,7 @@ export function generateDefaultYearDataset(year: number): YearDataset {
     return {
       ...contract,
       id: contractId,
-      nomerKontrak,
+      nomorKontrak,
       tahun: year,
       tahunAnggaran: year,
       periodeAwal: `${year}-01-01`,

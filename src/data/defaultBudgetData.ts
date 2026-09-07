@@ -1596,7 +1596,7 @@ export const DEFAULT_ALIH_DAYA_CONTRACTS: AlihDayaContract[] = [
   {
     id: 'kontrak_ad_1',
     namaKontrak: 'Jasa Pengamanan / Security Gardu Induk & Kantor UPT Madiun',
-    nomerKontrak: '012.PJ/DAN.02.01/UPT-MDN/2026',
+    nomorKontrak: '012.PJ/DAN.02.01/UPT-MDN/2026',
     vendor: 'PT Haleyora Power',
     posType: 'Pos 53',
     glAccountDefault: '6106201700',
@@ -1935,7 +1935,7 @@ export const DEFAULT_ALIH_DAYA_CONTRACTS: AlihDayaContract[] = [
   {
     id: 'kontrak_ad_2',
     namaKontrak: 'Jasa Kebersihan (Cleaning Service) Kantor & Gardu Induk',
-    nomerKontrak: '018.PJ/DAN.02.01/UPT-MDN/2026',
+    nomorKontrak: '018.PJ/DAN.02.01/UPT-MDN/2026',
     vendor: 'PT Kiat Daya Mandiri',
     posType: 'Pos 53',
     glAccountDefault: '6106200200',
@@ -2274,7 +2274,7 @@ export const DEFAULT_ALIH_DAYA_CONTRACTS: AlihDayaContract[] = [
   {
     id: 'kontrak_ad_3',
     namaKontrak: 'Pelayanan Pemeliharaan Gardu Induk (YanHar GI) Tahap I & II',
-    nomerKontrak: '025.PJ/DAN.01.02/UPT-MDN/2026',
+    nomorKontrak: '025.PJ/DAN.01.02/UPT-MDN/2026',
     vendor: 'PT Haleyora Powerindo',
     posType: 'Pos 53',
     glAccountDefault: '6106200700',
@@ -2367,7 +2367,7 @@ export const DEFAULT_ALIH_DAYA_CONTRACTS: AlihDayaContract[] = [
   {
     id: 'kontrak_ad_4',
     namaKontrak: 'Jasa Ground Patrol & ROW Jalur Transmisi SUTT/SUTET',
-    nomerKontrak: '031.PJ/DAN.01.03/UPT-MDN/2026',
+    nomorKontrak: '031.PJ/DAN.01.03/UPT-MDN/2026',
     vendor: 'PT Mandiri Daya Transmisi',
     posType: 'Pos 53',
     glAccountDefault: '6106200800',
@@ -2421,7 +2421,7 @@ export const DEFAULT_ALIH_DAYA_CONTRACTS: AlihDayaContract[] = [
   {
     id: 'kontrak_ad_5',
     namaKontrak: 'Jasa Pengemudi / Driver Operasional & Pelayanan Kantor',
-    nomerKontrak: '007.PJ/DAN.03.01/UPT-MDN/2026',
+    nomorKontrak: '007.PJ/DAN.03.01/UPT-MDN/2026',
     vendor: 'PT Pelayanan Trans Madiun',
     posType: 'Beban Sewa',
     glAccountDefault: '6101310001',

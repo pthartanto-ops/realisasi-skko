@@ -3,9 +3,9 @@ import { AppUser } from '../types';
 export const DEFAULT_USERS: AppUser[] = [
   {
     id: 'user-admin-1',
-    nama: 'Administrator Anggaran',
+    nama: 'Puji Tri Hartanto',
     nip: '198503152009121002',
-    jabatan: 'Supervisor Keuangan & Pengelolaan Anggaran',
+    jabatan: 'Assistant Manager Keuangan dan Umum',
     password: 'admin',
     role: 'admin',
     createdAt: '2026-01-01'

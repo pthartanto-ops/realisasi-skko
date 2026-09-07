@@ -139,7 +139,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
 
   // Form states for Contract Modal
   const [formNamaKontrak, setFormNamaKontrak] = useState('');
-  const [formnomorKontrak, setFormnomorKontrak] = useState('');
+  const [formNomorKontrak, setFormNomorKontrak] = useState('');
   const [formVendor, setFormVendor] = useState('');
   const [formPosAnggaran, setFormPosAnggaran] = useState<PosType>('Pos 53');
   const [formGLDefault, setFormGLDefault] = useState('');
@@ -357,7 +357,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
   const handleOpenAddContract = () => {
     setEditingContract(null);
     setFormNamaKontrak('');
-    setFormnomorKontrak('');
+    setFormNomorKontrak('');
     setFormVendor('');
     setFormPosAnggaran('Pos 53');
     setFormGLDefault('6106201700');
@@ -373,7 +373,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
   const handleOpenEditContract = (contract: AlihDayaContract) => {
     setEditingContract(contract);
     setFormNamaKontrak(contract.namaKontrak || '');
-    setFormnomorKontrak(contract.nomorKontrak || '');
+    setFormNomorKontrak(contract.nomorKontrak || contract.nomerKontrak || '');
     setFormVendor(contract.vendor || '');
     setFormPosAnggaran((contract.posAnggaran || contract.posType || 'Pos 53') as PosType);
     setFormGLDefault(contract.glAccountDefault || '');
@@ -390,8 +390,12 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setContractError(null);
 
     const namaTrim = formNamaKontrak.trim();
-    const nomorTrim = formnomorKontrak.trim();
+    const nomorTrim = formNomorKontrak.trim();
 
+    if (!namaTrim && !nomorTrim) {
+      setContractError('Nama Kontrak dan Nomor Kontrak wajib diisi.');
+      return;
+    }
     if (!namaTrim) {
       setContractError('Nama Kontrak (No. 1) wajib diisi.');
       return;
@@ -402,7 +406,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
     }
 
     if (namaTrim.toLowerCase() === nomorTrim.toLowerCase()) {
-      setContractError('Nama Kontrak (1) dan nomor Kontrak (2) tidak boleh sama persis.');
+      setContractError('Nama Kontrak (No. 1) dan Nomor Kontrak (No. 2) tidak boleh sama persis.');
       return;
     }
 
@@ -410,6 +414,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
       const res = updateAlihDayaContract(editingContract.id, {
         namaKontrak: namaTrim,
         nomorKontrak: nomorTrim,
+        nomerKontrak: nomorTrim,
         vendor: formVendor.trim(),
         posAnggaran: formPosAnggaran,
         posType: formPosAnggaran,
@@ -469,6 +474,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
       const res = addAlihDayaContract({
         namaKontrak: namaTrim,
         nomorKontrak: nomorTrim,
+        nomerKontrak: nomorTrim,
         vendor: formVendor.trim(),
         posAnggaran: formPosAnggaran,
         posType: formPosAnggaran,
@@ -726,7 +732,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  Monitoring Kontrak Rutin
+                  Monitoring Kontrak
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
                   Tahun Anggaran {selectedYear || 2026}
@@ -748,7 +754,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               id="btn-export-alih-daya"
               onClick={handleExportExcel}
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 transition-colors"
-              title="Export data monitoring kontrak rutin ke format Excel (termasuk Matriks 12 Bulan &amp; Rincian Termin)"
+              title="Export data monitoring kontrak ke format Excel (termasuk Matriks 12 Bulan &amp; Rincian Termin)"
             >
               <Download className="w-4 h-4 text-slate-600" />
               <span>Export Excel</span>
@@ -1442,13 +1448,13 @@ export const AlihDayaMonitoringView: React.FC = () => {
                       </div>
 
                       <div className="space-y-1">
-                        {/* Nama Kontrak & nomor Kontrak */}
+                        {/* Nama Kontrak & Nomor Kontrak */}
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <h2 className="text-base font-bold text-slate-900 tracking-tight">
                             {contract.namaKontrak}
                           </h2>
                           <span className="px-2.5 py-0.5 bg-slate-900 text-white rounded text-xs font-mono font-medium tracking-wide">
-                            No: {contract.nomorKontrak}
+                            No: {contract.nomorKontrak || contract.nomerKontrak}
                           </span>
                           {(contract.posAnggaran || contract.posType) && (
                             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -1789,7 +1795,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-300">
                   <th className="py-3 px-3 text-center w-12">No</th>
                   <th className="py-3 px-4 min-w-[200px]">Nama Kontrak</th>
-                  <th className="py-3 px-3 min-w-[160px]">nomor Kontrak</th>
+                  <th className="py-3 px-3 min-w-[160px]">Nomor Kontrak</th>
                   <th className="py-3 px-3 min-w-[120px]">Vendor</th>
                   <th className="py-3 px-3 min-w-[100px]">Pos</th>
                   {numericMonth !== null && (
@@ -1983,7 +1989,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                   <th className="py-2.5 px-3 text-center w-10">No</th>
                   <th className="py-2.5 px-3 min-w-[90px]">Bulan</th>
                   <th className="py-2.5 px-4 min-w-[170px]">Nama Kontrak</th>
-                  <th className="py-2.5 px-3 min-w-[130px]">nomor Kontrak</th>
+                  <th className="py-2.5 px-3 min-w-[130px]">Nomor Kontrak</th>
                   <th className="py-2.5 px-3 min-w-[140px]">Termin Tagihan</th>
                   <th className="py-2.5 px-3 min-w-[150px]">GL Account</th>
                   <th className="py-2.5 px-3 text-right min-w-[130px]">Nominal Tagihan</th>
@@ -2245,23 +2251,23 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 />
               </div>
 
-              {/* nomor Kontrak (Must NOT be same as Nama Kontrak) */}
+              {/* Nomor Kontrak (Must NOT be same as Nama Kontrak) */}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  nomor Kontrak <span className="text-rose-500">*</span>{' '}
+                  Nomor Kontrak <span className="text-rose-500">*</span>{' '}
                   <span className="font-normal text-slate-500">(Wajib unik &amp; berbeda dari Nama Kontrak)</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={formnomorKontrak}
-                  onChange={(e) => setFormnomorKontrak(e.target.value)}
+                  value={formNomorKontrak}
+                  onChange={(e) => setFormNomorKontrak(e.target.value)}
                   placeholder="Contoh: 002.PJ/DAN.02.01/B03000000/2026"
                   className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {formNamaKontrak && formnomorKontrak && formNamaKontrak.trim().toLowerCase() === formnomorKontrak.trim().toLowerCase() && (
+                {formNamaKontrak && formNomorKontrak && formNamaKontrak.trim().toLowerCase() === formNomorKontrak.trim().toLowerCase() && (
                   <p className="text-[11px] text-rose-600 mt-1 font-semibold">
-                    ⚠️ Peringatan: Nama Kontrak dan nomor Kontrak tidak boleh sama!
+                    ⚠️ Peringatan: Nama Kontrak dan Nomor Kontrak tidak boleh sama!
                   </p>
                 )}
               </div>

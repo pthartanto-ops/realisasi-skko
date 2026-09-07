@@ -187,7 +187,7 @@ export const MultiTerminSchemeModal: React.FC<MultiTerminSchemeModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-base">Atur Skema Termin Tagihan Bulanan</h3>
-              <p className="text-xs text-blue-200">{contract.namaKontrak} ({contract.nomerKontrak})</p>
+              <p className="text-xs text-blue-200">{contract.namaKontrak} ({contract.nomorKontrak || contract.nomerKontrak})</p>
             </div>
           </div>
           <button

@@ -157,7 +157,7 @@ export function generateAlihDayaMonthlyCommitments(
       g.contracts.push({
         contractId: contract.id,
         contractName: contract.namaKontrak || 'Kontrak Rutin',
-        contractNumber: contract.nomerKontrak || '',
+        contractNumber: contract.nomorKontrak || contract.nomerKontrak || '',
         vendor: contract.vendor || '',
         terminId: termin.id,
         terminLabel: termin.terminTagihan || termin.termin || `Termin`,

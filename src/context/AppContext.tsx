@@ -201,12 +201,14 @@ const normalizeContract = (c: AlihDayaContract): AlihDayaContract => {
   const tahun = c.tahunAnggaran || c.tahun || 2026;
   const glDef = c.glAccountDefault || '6106201700';
   const glNameDef = c.glAccountNameDefault || c.glAccountDefaultName || '';
+  const numContract = (c.nomorKontrak || c.nomerKontrak || '').trim();
 
   return {
     ...c,
     id: c.id || `kontrak_ad_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    namaKontrak: c.namaKontrak || '',
-    nomerKontrak: c.nomerKontrak || '',
+    namaKontrak: (c.namaKontrak || '').trim(),
+    nomorKontrak: numContract,
+    nomerKontrak: numContract,
     vendor: c.vendor || '',
     posAnggaran: pos,
     posType: pos,
@@ -1252,36 +1254,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Alih Daya Contract & Termin operations
   const addAlihDayaContract = (contractData: Omit<AlihDayaContract, 'id' | 'termins'> & { termins?: AlihDayaTermin[] }) => {
     const namaTrim = (contractData.namaKontrak || '').trim();
-    const nomerTrim = (contractData.nomerKontrak || '').trim();
+    const nomorTrim = (contractData.nomorKontrak || contractData.nomerKontrak || '').trim();
 
-    if (!namaTrim || !nomerTrim) {
-      return { success: false, message: 'Nama Kontrak dan Nomer Kontrak wajib diisi.' };
+    if (!namaTrim && !nomorTrim) {
+      return { success: false, message: 'Nama Kontrak dan Nomor Kontrak wajib diisi.' };
+    }
+    if (!namaTrim) {
+      return { success: false, message: 'Nama Kontrak wajib diisi.' };
+    }
+    if (!nomorTrim) {
+      return { success: false, message: 'Nomor Kontrak wajib diisi.' };
     }
 
     // Ketentuan Tambahan: Data No 1 dan 2 tidak boleh sama
-    if (namaTrim.toLowerCase() === nomerTrim.toLowerCase()) {
+    if (namaTrim.toLowerCase() === nomorTrim.toLowerCase()) {
       return { 
         success: false, 
-        message: 'Nama Kontrak (No. 1) dan Nomer Kontrak (No. 2) tidak boleh sama persis!' 
+        message: 'Nama Kontrak (No. 1) dan Nomor Kontrak (No. 2) tidak boleh sama persis!' 
       };
     }
 
     // Cek duplikasi dengan kontrak yang sudah ada
     const isDuplicate = alihDayaContracts.some(
-      c => (c.nomerKontrak || '').toLowerCase().trim() === nomerTrim.toLowerCase() ||
-           (c.namaKontrak || '').toLowerCase().trim() === namaTrim.toLowerCase()
+      c => ((c.nomorKontrak || c.nomerKontrak || '').toLowerCase().trim() === nomorTrim.toLowerCase()) ||
+           ((c.namaKontrak || '').toLowerCase().trim() === namaTrim.toLowerCase())
     );
     if (isDuplicate) {
       return { 
         success: false, 
-        message: 'Kontrak dengan Nama atau Nomer Kontrak ini sudah terdaftar. Gunakan identitas yang unik.' 
+        message: 'Kontrak dengan Nama atau Nomor Kontrak ini sudah terdaftar. Gunakan identitas yang unik.' 
       };
     }
 
     const newContract: AlihDayaContract = normalizeContract({
       ...contractData,
       namaKontrak: namaTrim,
-      nomerKontrak: nomerTrim,
+      nomorKontrak: nomorTrim,
+      nomerKontrak: nomorTrim,
       id: `kontrak_ad_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       termins: contractData.termins || []
     });
@@ -1295,30 +1304,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!current) return { success: false, message: 'Kontrak tidak ditemukan.' };
 
     const newNama = (updated.namaKontrak !== undefined ? updated.namaKontrak : current.namaKontrak || '').trim();
-    const newNomer = (updated.nomerKontrak !== undefined ? updated.nomerKontrak : current.nomerKontrak || '').trim();
+    const updatedNum = updated.nomorKontrak !== undefined ? updated.nomorKontrak : updated.nomerKontrak;
+    const currentNum = current.nomorKontrak || current.nomerKontrak || '';
+    const newNomor = (updatedNum !== undefined ? updatedNum : currentNum).trim();
 
-    if (!newNama || !newNomer) {
-      return { success: false, message: 'Nama Kontrak dan Nomer Kontrak wajib diisi.' };
+    if (!newNama && !newNomor) {
+      return { success: false, message: 'Nama Kontrak dan Nomor Kontrak wajib diisi.' };
+    }
+    if (!newNama) {
+      return { success: false, message: 'Nama Kontrak wajib diisi.' };
+    }
+    if (!newNomor) {
+      return { success: false, message: 'Nomor Kontrak wajib diisi.' };
     }
 
     // Ketentuan Tambahan: Data No 1 dan 2 tidak boleh sama
-    if (newNama.toLowerCase() === newNomer.toLowerCase()) {
+    if (newNama.toLowerCase() === newNomor.toLowerCase()) {
       return { 
         success: false, 
-        message: 'Nama Kontrak (No. 1) dan Nomer Kontrak (No. 2) tidak boleh sama persis!' 
+        message: 'Nama Kontrak (No. 1) dan Nomor Kontrak (No. 2) tidak boleh sama persis!' 
       };
     }
 
     const isDuplicate = alihDayaContracts.some(
       c => c.id !== id && (
-        (c.nomerKontrak || '').toLowerCase().trim() === newNomer.toLowerCase() ||
-        (c.namaKontrak || '').toLowerCase().trim() === newNama.toLowerCase()
+        ((c.nomorKontrak || c.nomerKontrak || '').toLowerCase().trim() === newNomor.toLowerCase()) ||
+        ((c.namaKontrak || '').toLowerCase().trim() === newNama.toLowerCase())
       )
     );
     if (isDuplicate) {
       return { 
         success: false, 
-        message: 'Nama atau Nomer Kontrak ini sudah digunakan oleh kontrak lain.' 
+        message: 'Nama atau Nomor Kontrak ini sudah digunakan oleh kontrak lain.' 
       };
     }
 
@@ -1328,7 +1345,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...c,
           ...updated,
           namaKontrak: newNama,
-          nomerKontrak: newNomer
+          nomorKontrak: newNomor,
+          nomerKontrak: newNomor
         });
       }
       return c;

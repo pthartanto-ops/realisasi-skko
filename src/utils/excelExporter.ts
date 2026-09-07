@@ -125,7 +125,7 @@ export function exportFullReportToExcel(
   if (alihDayaContracts && alihDayaContracts.length > 0) {
     const alihDayaHeaders = [
       'NAMA KONTRAK',
-      'NOMER KONTRAK',
+      'NOMOR KONTRAK',
       'TERMIN TAGIHAN',
       'GL ACCOUNT',
       'NOMINAL TAGIHAN (RP)',
@@ -138,7 +138,7 @@ export function exportFullReportToExcel(
       c.termins.forEach(t => {
         alihDayaData.push([
           c.namaKontrak,
-          c.nomerKontrak,
+          c.nomorKontrak || c.nomerKontrak || '',
           t.terminTagihan || t.termin || '',
           t.glAccount,
           t.nominalTagihan ?? t.amount ?? 0,
@@ -190,7 +190,7 @@ export function exportAlihDayaToExcel(
   const rekapHeaders = [
     'NO',
     'NAMA KONTRAK',
-    'NOMER KONTRAK',
+    'NOMOR KONTRAK',
     'VENDOR / PELAKSANA',
     'POS ANGGARAN',
     'GL ACCOUNT DEFAULT',
@@ -224,7 +224,7 @@ export function exportAlihDayaToExcel(
     rekapData.push([
       idx + 1,
       c.namaKontrak,
-      c.nomerKontrak,
+      c.nomorKontrak || c.nomerKontrak || '',
       c.vendor || '-',
       c.posAnggaran || c.posType || '-',
       c.glAccountDefault || '-',
@@ -248,7 +248,7 @@ export function exportAlihDayaToExcel(
   const matrixHeaders = [
     'NO',
     'NAMA KONTRAK',
-    'NOMER KONTRAK',
+    'NOMOR KONTRAK',
     'VENDOR',
     'POS ANGGARAN',
     'GL ACCOUNT',
@@ -295,7 +295,7 @@ export function exportAlihDayaToExcel(
     matrixData.push([
       idx + 1,
       c.namaKontrak,
-      c.nomerKontrak,
+      c.nomorKontrak || c.nomerKontrak || '',
       c.vendor || '-',
       c.posAnggaran || c.posType || '-',
       c.glAccountDefault || '-',
@@ -313,7 +313,7 @@ export function exportAlihDayaToExcel(
   // 3. Sheet Rincian Seluruh Termin
   const terminHeaders = [
     'NAMA KONTRAK',
-    'NOMER KONTRAK',
+    'NOMOR KONTRAK',
     'BULAN TAGIHAN',
     'TERMIN TAGIHAN',
     'GL ACCOUNT',
@@ -340,7 +340,7 @@ export function exportAlihDayaToExcel(
 
       terminData.push([
         c.namaKontrak,
-        c.nomerKontrak,
+        c.nomorKontrak || c.nomerKontrak || '',
         monthLabel,
         t.terminTagihan || t.termin || '',
         t.glAccount,

@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
 
   // All available nav items in requested order:
   // 1. Dashboard Utama, 2. Indikator & Kinerja, 3. Laporan & Ringkasan,
-  // 4. Prognosa Anggaran, 5. Monitoring Kontrak Rutin, 6. Matriks Monitoring,
+  // 4. Prognosa Anggaran, 5. Monitoring Kontrak, 6. Matriks Monitoring,
   // 7. Input & Edit Anggaran, 8. Input Realisasi Manual, 9. Import Excel, 10. Manajemen User
   const allNavItems: { 
     id: ActiveTab; 
@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     { id: 'performance', label: 'Indikator & Kinerja', icon: Target },
     { id: 'reports', label: 'Laporan & Ringkasan', icon: FileText },
     { id: 'prognosa', label: 'Prognosa Anggaran', icon: Calculator, hasDividerBefore: true },
-    { id: 'alih_daya', label: 'Monitoring Kontrak Rutin', icon: Briefcase, badge: `${alihDayaContracts.length}` },
+    { id: 'alih_daya', label: 'Monitoring Kontrak', icon: Briefcase, badge: `${alihDayaContracts.length}` },
     { id: 'matrix', label: 'Matriks Monitoring', icon: TableProperties },
     { id: 'budget_input', label: 'Input & Edit Anggaran', icon: FileEdit, badge: `${budgetItems.filter(i => !i.isGroupHeader).length}`, hasDividerBefore: true },
     { id: 'realization_input', label: 'Input Realisasi Manual', icon: Receipt, badge: 'Manual' },
@@ -100,109 +100,72 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   const roleConfig = ROLE_PERMISSIONS[currentUser.role] || ROLE_PERMISSIONS.user;
 
   return (
-    <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+    <header className="bg-black text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
       {/* Top Banner Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Brand & Title */}
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0 font-bold">
-              <Building2 className="w-5 h-5" />
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-3">
+        {/* Row 1: Brand/Logo on Left, User Profile + Quick Logout & Filters on Right */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+          {/* Brand with PLN Official Logo */}
+          <div className="flex items-center gap-3">
+            {/* PLN Yellow Box Emblem */}
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[#FFE600] rounded-xs p-1 flex items-center justify-center shrink-0 shadow-md">
+              <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* 3 Blue Waves (Gelombang Air) */}
+                <path
+                  d="M 8 58 C 20 51 28 65 40 58 C 52 51 60 65 72 58 C 84 51 90 65 96 58"
+                  stroke="#0096D6"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                <path
+                  d="M 8 68 C 20 61 28 75 40 68 C 52 61 60 75 72 68 C 84 61 90 75 96 68"
+                  stroke="#0096D6"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                <path
+                  d="M 8 78 C 20 71 28 85 40 78 C 52 71 60 85 72 78 C 84 71 90 85 96 78"
+                  stroke="#0096D6"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                {/* Red Lightning Bolt (Petir Merah) */}
+                <polygon
+                  points="58,6 26,50 48,50 36,94 74,38 52,38"
+                  fill="#ED1C24"
+                  stroke="#FFE600"
+                  strokeWidth="1.5"
+                  strokeLinejoin="miter"
+                />
+              </svg>
             </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-                Pemantauan Realisasi Anggaran
-              </h1>
-              <p className="text-xs text-slate-400">
-                Dashboard Monitoring, Input Anggaran Manual & Import Realisasi Excel
-              </p>
+
+            <div className="leading-tight">
+              <div className="text-base sm:text-lg lg:text-xl font-black tracking-tight text-white uppercase">
+                PT PLN (PERSERO)
+              </div>
+              <div className="text-base sm:text-lg lg:text-xl font-black tracking-tight text-white uppercase">
+                UNIT PELAKSANA TRANSMISI MADIUN
+              </div>
             </div>
           </div>
 
-          {/* Quick Metrics & Controls */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Period Filters */}
-            <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-lg p-1 text-xs">
-              <div className="flex items-center gap-1.5 px-2 py-1 text-slate-300">
-                <Calendar className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-slate-400">Tahun:</span>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="bg-slate-900 text-white font-semibold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-blue-500 text-xs cursor-pointer"
-                >
-                  {(availableYears || [2024, 2025, 2026, 2027]).map(yr => (
-                    <option key={yr} value={yr}>{yr}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="h-4 w-px bg-slate-700" />
-
-              <div className="flex items-center gap-1.5 px-2 py-1 text-slate-300">
-                <span className="text-slate-400">Cut-off s.d.:</span>
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="bg-slate-900 text-white font-semibold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-blue-500 text-xs cursor-pointer"
-                >
-                  {MONTH_NAMES.map((name, idx) => (
-                    <option key={idx} value={idx}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-
-            {/* Actions & User Profile */}
+          {/* Right Column: User Profile Row + Period Filter Row */}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {/* User Profile & Quick Logout */}
             <div className="flex items-center gap-2">
-              <button
-                id="btn-supabase-sync"
-                onClick={() => setIsSupabaseModalOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer border ${
-                  isSupabaseEnabled
-                    ? supabaseSyncStatus === 'syncing'
-                      ? 'bg-amber-600/30 text-amber-300 border-amber-500/40 animate-pulse'
-                      : supabaseSyncStatus === 'error'
-                      ? 'bg-red-900/30 text-red-300 border-red-500/40'
-                      : 'bg-emerald-950/60 text-emerald-300 hover:bg-emerald-900/70 border-emerald-500/40'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
-                }`}
-                title="Status & Pengaturan Database Cloud Supabase"
-              >
-                <Database className={`w-3.5 h-3.5 ${isSupabaseEnabled ? 'text-emerald-400' : 'text-slate-400'}`} />
-                <span className="hidden xl:inline">
-                  {isSupabaseEnabled ? (supabaseSyncStatus === 'syncing' ? 'Menyimpan...' : 'Supabase DB') : 'Setup Supabase'}
-                </span>
-              </button>
-
-              <button
-                id="btn-export-header-excel"
-                onClick={handleExport}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                title="Export seluruh data pemantauan ke file Excel (.xlsx)"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Export Excel</span>
-              </button>
-
               {/* User Profile & Role Dropdown */}
               <div className="relative" ref={userMenuRef}>
                 <button
                   id="btn-user-profile-menu"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700/90 border border-slate-700 text-left transition-all cursor-pointer shadow-xs"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/80 text-left transition-all cursor-pointer shadow-xs"
                 >
                   {/* Initials Avatar */}
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${
-                    currentUser.role === 'admin' 
-                      ? 'bg-rose-500 text-white' 
-                      : currentUser.role === 'management'
-                      ? 'bg-amber-500 text-slate-950 font-black'
-                      : 'bg-blue-500 text-white'
-                  }`}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs bg-[#E11D48] text-white shadow-xs">
                     {currentUser.nama
                       .split(' ')
                       .filter(Boolean)
@@ -212,27 +175,20 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                       .toUpperCase()}
                   </div>
 
-                  <div className="hidden sm:block text-left leading-tight">
-                    <span className="text-xs font-semibold text-white block max-w-[130px] truncate">
+                  <div className="text-left leading-tight">
+                    <span className="text-xs font-bold text-white block uppercase tracking-wide">
                       {currentUser.nama}
                     </span>
-                    <span className="text-[10px] text-slate-400 block truncate">
+                    <span className="text-[10px] text-slate-400 block uppercase tracking-wider font-medium">
                       {currentUser.jabatan}
                     </span>
                   </div>
 
-                  {/* Role badge */}
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                    currentUser.role === 'admin'
-                      ? 'bg-rose-950/70 text-rose-300 border-rose-500/40'
-                      : currentUser.role === 'management'
-                      ? 'bg-amber-950/70 text-amber-300 border-amber-500/40'
-                      : 'bg-blue-950/70 text-blue-300 border-blue-500/40'
-                  }`}>
-                    {roleConfig.label}
-                  </span>
-
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  {/* Role badge with Dropdown Arrow */}
+                  <div className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded border uppercase tracking-wider bg-[#3B111F] text-rose-300 border-rose-500/50">
+                    <span>{currentUser.role.toUpperCase()}</span>
+                    <ChevronDown className="w-3 h-3 text-rose-300" />
+                  </div>
                 </button>
 
                 {/* Dropdown Menu */}
@@ -241,13 +197,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                     {/* User Profile Card inside Dropdown */}
                     <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
                       <div className="flex items-center gap-2.5 mb-1.5">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                          currentUser.role === 'admin'
-                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                            : currentUser.role === 'management'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                            : 'bg-blue-100 text-blue-700 border border-blue-200'
-                        }`}>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-[#E11D48] text-white">
                           {currentUser.nama
                             .split(' ')
                             .filter(Boolean)
@@ -272,13 +222,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
 
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-slate-500 font-medium">Role:</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                          currentUser.role === 'admin'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : currentUser.role === 'management'
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-blue-50 text-blue-700 border-blue-200'
-                        }`}>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded border uppercase bg-rose-50 text-rose-700 border-rose-200">
                           {roleConfig.label}
                         </span>
                       </div>
@@ -318,16 +262,91 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               {/* Quick Logout Button */}
               <button
                 id="btn-header-quick-logout"
-                onClick={() => {
-                  setIsLogoutModalOpen(true);
-                }}
+                onClick={() => setIsLogoutModalOpen(true)}
                 title={`Keluar / Ganti Akun dari ${currentUser.nama}`}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                className="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700/80 hover:border-rose-500/50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
               >
                 <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden md:inline">Logout</span>
+                <span>Logout</span>
               </button>
             </div>
+
+            {/* Period Filters */}
+            <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg p-1 text-xs">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 text-slate-300">
+                <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-slate-400 font-medium">Tahun:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="bg-slate-950 text-white font-semibold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-blue-500 text-xs cursor-pointer"
+                >
+                  {(availableYears || [2024, 2025, 2026, 2027]).map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="h-4 w-px bg-slate-700" />
+
+              <div className="flex items-center gap-1.5 px-2 py-0.5 text-slate-300">
+                <span className="text-slate-400 font-medium">Cut-off s.d.:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="bg-slate-950 text-white font-semibold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-blue-500 text-xs cursor-pointer"
+                >
+                  {MONTH_NAMES.map((name, idx) => (
+                    <option key={idx} value={idx}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Centered Title with Action Buttons on Right */}
+        <div className="relative flex items-center justify-between mt-3.5 pt-1 gap-2 sm:gap-4">
+          {/* Left spacer matching right actions width to guarantee exact visual balance and avoid any overlap */}
+          <div className="hidden sm:flex items-center gap-2 w-[76px] shrink-0 pointer-events-none" aria-hidden="true" />
+
+          {/* Centered Large Title - with clean negative space & responsive scaling */}
+          <div className="flex-1 flex justify-center text-center px-1">
+            <h1 className="text-base sm:text-xl md:text-2xl lg:text-3xl font-black tracking-wide sm:tracking-wider text-white uppercase text-center drop-shadow-xs">
+              MONITORING REALISASI ANGGARAN OPERASI
+            </h1>
+          </div>
+
+          {/* Right-aligned Actions (Database & Export Excel) */}
+          <div className="flex items-center gap-2 shrink-0 z-10">
+            <button
+              id="btn-supabase-sync"
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className={`p-2 rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer border ${
+                isSupabaseEnabled
+                  ? supabaseSyncStatus === 'syncing'
+                    ? 'bg-amber-600/30 text-amber-300 border-amber-500/40 animate-pulse'
+                    : supabaseSyncStatus === 'error'
+                    ? 'bg-red-900/30 text-red-300 border-red-500/40'
+                    : 'bg-emerald-950/60 text-emerald-300 hover:bg-emerald-900/70 border-emerald-500/40'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700'
+              }`}
+              title="Status & Pengaturan Database Cloud Supabase"
+            >
+              <Database className={`w-4 h-4 ${isSupabaseEnabled ? 'text-emerald-400' : 'text-slate-400'}`} />
+            </button>
+
+            <button
+              id="btn-export-header-excel"
+              onClick={handleExport}
+              className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/40 shadow-xs transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              title="Export seluruh data pemantauan ke file Excel (.xlsx)"
+              aria-label="Export seluruh data pemantauan ke file Excel (.xlsx)"
+            >
+              <Download className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

@@ -191,7 +191,8 @@ export interface AlihDayaTermin {
 export interface AlihDayaContract {
   id: string;
   namaKontrak: string; // 1. Nama Kontrak (Wajib, Unik)
-  nomerKontrak: string; // 2. Nomer Kontrak (Wajib, Unik, tidak boleh sama dengan namaKontrak)
+  nomorKontrak?: string; // 2. Nomor Kontrak (Wajib, Unik, tidak boleh sama dengan namaKontrak)
+  nomerKontrak?: string; // alias for backward compatibility
   vendor?: string; // Nama Rekanan / Vendor Alih Daya (contoh: PT Haleyora Power)
   posAnggaran?: PosType; // Kelompok Pos Anggaran
   posType?: PosType; // alias

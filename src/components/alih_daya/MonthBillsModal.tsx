@@ -54,7 +54,7 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
         const notesParts: string[] = [];
         if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
         if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-        if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+        if ((contract.nomorKontrak || contract.nomerKontrak)?.trim()) notesParts.push(`No. Kontrak: ${(contract.nomorKontrak || contract.nomerKontrak)!.trim()}`);
 
         const initialBill: AlihDayaTermin = {
           id: `t_ad_new_${Date.now()}_1`,
@@ -109,7 +109,7 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
     const notesParts: string[] = [];
     if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
     if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    if ((contract.nomorKontrak || contract.nomerKontrak)?.trim()) notesParts.push(`No. Kontrak: ${(contract.nomorKontrak || contract.nomerKontrak)!.trim()}`);
     
     const newBill: AlihDayaTermin = {
       id: `t_ad_new_${Date.now()}_${nextNumber}`,
@@ -136,7 +136,7 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
     const notesParts: string[] = [];
     if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
     if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    if ((contract.nomorKontrak || contract.nomerKontrak)?.trim()) notesParts.push(`No. Kontrak: ${(contract.nomorKontrak || contract.nomerKontrak)!.trim()}`);
 
     setBills(prev => {
       const next = [...prev];
@@ -162,7 +162,7 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
     const notesParts: string[] = [];
     if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
     if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    if ((contract.nomorKontrak || contract.nomerKontrak)?.trim()) notesParts.push(`No. Kontrak: ${(contract.nomorKontrak || contract.nomerKontrak)!.trim()}`);
 
     setBills(prev => prev.map((bill, idx) => ({
       ...bill,
@@ -229,7 +229,7 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
             </div>
             <div className="text-xs text-blue-200 mt-0.5 flex items-center gap-2">
               <span className="font-semibold text-white truncate max-w-sm">{contract.namaKontrak}</span>
-              <span className="bg-blue-800/80 px-1.5 py-0.5 rounded font-mono text-[11px]">{contract.nomerKontrak}</span>
+              <span className="bg-blue-800/80 px-1.5 py-0.5 rounded font-mono text-[11px]">{contract.nomorKontrak || contract.nomerKontrak}</span>
             </div>
           </div>
           <button
@@ -313,7 +313,7 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
               </div>
               <div>
                 <span className="text-slate-500">Nomor:</span>
-                <div className="font-mono font-medium text-slate-900 truncate" title={contract.nomerKontrak}>{contract.nomerKontrak}</div>
+                <div className="font-mono font-medium text-slate-900 truncate" title={contract.nomorKontrak || contract.nomerKontrak}>{contract.nomorKontrak || contract.nomerKontrak}</div>
               </div>
               <div>
                 <span className="text-slate-500">Vendor:</span>
