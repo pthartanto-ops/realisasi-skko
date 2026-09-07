@@ -146,9 +146,11 @@ export const AlihDayaMonitoringView: React.FC = () => {
   const [formGLNameDefault, setFormGLNameDefault] = useState('');
   const [formTahun, setFormTahun] = useState<number>(selectedYear || 2026);
   const [formKeterangan, setFormKeterangan] = useState('');
+  const [formInitialScheme, setFormInitialScheme] = useState<'nihil' | 'sekali_setahun' | 'bulanan'>('nihil');
   const [contractError, setContractError] = useState<string | null>(null);
 
   // Form states for Termin Modal
+  const [formTerminScheme, setFormTerminScheme] = useState<'bulanan' | 'sekali_setahun'>('bulanan');
   const [formTerminMonthIndex, setFormTerminMonthIndex] = useState<number>(selectedMonth ?? 0);
   const [formTerminName, setFormTerminName] = useState('');
   const [formTerminGL, setFormTerminGL] = useState('');
@@ -362,6 +364,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setFormGLNameDefault('Beban jasa borong perlengk Umum');
     setFormTahun(selectedYear || 2026);
     setFormKeterangan('');
+    setFormInitialScheme('nihil');
     setContractError(null);
     setIsContractModalOpen(true);
   };
@@ -420,7 +423,49 @@ export const AlihDayaMonitoringView: React.FC = () => {
         return;
       }
     } else {
-      // Default termin bulanan adalah nihil (belum terisi / tidak ada termin otomatis)
+      // Siapkan initial termins berdasarkan skema pilihan user
+      const defaultYear = formTahun || selectedYear || 2026;
+      const contractPrefix = namaTrim ? `${namaTrim} - ` : '';
+      let initialTermins: Omit<AlihDayaTermin, 'id'>[] = [];
+
+      if (formInitialScheme === 'sekali_setahun') {
+        // Skema: Ditagihkan sekali dalam 1 tahun (1 termin tunggal di bulan Desember / akhir tahun)
+        const lastDay = new Date(defaultYear, 12, 0).getDate();
+        initialTermins = [{
+          terminTagihan: `${contractPrefix}Tagihan Tahunan (Sekali dalam 1 Tahun ${defaultYear})`,
+          bulanIndex: 11, // Desember
+          glAccount: formGLDefault.trim() || '6106201700',
+          glAccountName: formGLNameDefault.trim() || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
+          posType: formPosAnggaran,
+          nominalTagihan: 0,
+          amount: 0,
+          documentNumber: '',
+          statusBeban: 'Belum Tercatat',
+          tanggalJatuhTempo: `${defaultYear}-12-${lastDay}`,
+          notes: `Tagihan ditagihkan sekali dalam 1 tahun (${defaultYear})`
+        }];
+      } else if (formInitialScheme === 'bulanan') {
+        // Skema: 12 Termin bulanan rutin
+        MONTH_NAMES.forEach((mName, mIdx) => {
+          const mNum = String(mIdx + 1).padStart(2, '0');
+          const lDay = new Date(defaultYear, mIdx + 1, 0).getDate();
+          initialTermins.push({
+            terminTagihan: `${contractPrefix}Termin ${mIdx + 1} (${mName} ${defaultYear})`,
+            bulanIndex: mIdx,
+            glAccount: formGLDefault.trim() || '6106201700',
+            glAccountName: formGLNameDefault.trim() || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
+            posType: formPosAnggaran,
+            nominalTagihan: 0,
+            amount: 0,
+            documentNumber: '',
+            statusBeban: 'Belum Tercatat',
+            tanggalJatuhTempo: `${defaultYear}-${mNum}-${lDay}`,
+            notes: `Tagihan bulan ${mName} ${defaultYear}`
+          });
+        });
+      }
+
+      // Default termin bulanan adalah nihil bila formInitialScheme === 'nihil'
       const res = addAlihDayaContract({
         namaKontrak: namaTrim,
         nomerKontrak: nomerTrim,
@@ -432,7 +477,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
         tahunAnggaran: formTahun,
         keterangan: formKeterangan.trim(),
         statusKontrak: 'Aktif',
-        termins: [] // Nihil / belum terisi termin awal
+        termins: initialTermins
       });
       if (!res.success) {
         setContractError(res.message || 'Gagal menambahkan kontrak baru.');
@@ -457,6 +502,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setTargetContractIdForTermin(contractId);
     setEditingTermin(null);
     setFormTerminMonthIndex(targetMonth);
+    setFormTerminScheme('bulanan');
 
     // Salin seluruh data dari kontrak ke isian data termin:
     // 1. Uraian / Nama Termin Tagihan
@@ -500,8 +546,38 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setFormTerminDocNum(termin.documentNumber || '');
     setFormTerminTanggal(termin.tanggalJatuhTempo || termin.tglTagihan || '');
     setFormTerminNotes(termin.notes || '');
+
+    // Deteksi apakah termin ini merupakan skema tahunan / sekali dalam 1 tahun
+    const isAnnual = (termin.notes || '').toLowerCase().includes('sekali dalam 1 tahun') || 
+                     (termin.terminTagihan || '').toLowerCase().includes('tahunan') ||
+                     (termin.notes || '').toLowerCase().includes('lumpsum');
+    setFormTerminScheme(isAnnual ? 'sekali_setahun' : 'bulanan');
+
     setTerminError(null);
     setIsTerminModalOpen(true);
+  };
+
+  // Selector untuk ganti skema di dalam Termin Modal (Bulanan vs Sekali dalam 1 Tahun)
+  const handleSelectTerminScheme = (scheme: 'bulanan' | 'sekali_setahun') => {
+    setFormTerminScheme(scheme);
+    const contract = alihDayaContracts.find(c => c.id === targetContractIdForTermin);
+    const year = contract?.tahunAnggaran || contract?.tahun || selectedYear || 2026;
+    const contractPrefix = contract?.namaKontrak ? `${contract.namaKontrak} - ` : '';
+
+    if (scheme === 'sekali_setahun') {
+      setFormTerminName(`${contractPrefix}Tagihan Tahunan (Sekali dalam 1 Tahun ${year})`);
+      const notesParts: string[] = [`Tagihan ditagihkan sekali dalam 1 tahun (${year})`];
+      if (contract?.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+      if (contract?.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+      setFormTerminNotes(notesParts.join(' | '));
+    } else {
+      const terminCount = editingTermin ? '' : `${(contract?.termins?.length || 0) + 1}`;
+      setFormTerminName(`${contractPrefix}Termin ${terminCount || (formTerminMonthIndex + 1)} (${MONTH_NAMES[formTerminMonthIndex]} ${year})`);
+      const notesParts: string[] = [`Tagihan bulan ${MONTH_NAMES[formTerminMonthIndex]}`];
+      if (contract?.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+      if (contract?.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+      setFormTerminNotes(notesParts.join(' | '));
+    }
   };
 
   // Helper: Salin ulang seluruh data kontrak induk ke isian termin modal
@@ -513,17 +589,28 @@ export const AlihDayaMonitoringView: React.FC = () => {
     const monthNum = String(targetMonth + 1).padStart(2, '0');
     const lastDay = new Date(year, targetMonth + 1, 0).getDate();
     const terminOrder = (contract.termins?.length || 0) + (editingTermin ? 0 : 1);
+    const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
 
-    setFormTerminName(`${contract.namaKontrak ? `${contract.namaKontrak} - ` : ''}Termin ${terminOrder || 1} (${MONTH_NAMES[targetMonth]} ${year})`);
+    if (formTerminScheme === 'sekali_setahun') {
+      setFormTerminName(`${contractPrefix}Tagihan Tahunan (Sekali dalam 1 Tahun ${year})`);
+    } else {
+      setFormTerminName(`${contractPrefix}Termin ${terminOrder || 1} (${MONTH_NAMES[targetMonth]} ${year})`);
+    }
+
     setFormTerminGL(contract.glAccountDefault || '6106201700');
     setFormTerminGLName(contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin');
     setFormTerminPosType((contract.posAnggaran || contract.posType || 'Pos 53') as PosType);
 
     const notesParts: string[] = [];
+    if (formTerminScheme === 'sekali_setahun') {
+      notesParts.push(`Tagihan ditagihkan sekali dalam 1 tahun (${year})`);
+    } else {
+      notesParts.push(`Tagihan bulan ${MONTH_NAMES[targetMonth]}`);
+    }
     if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
     if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
     if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
-    setFormTerminNotes(notesParts.length > 0 ? notesParts.join(' | ') : `Tagihan bulan ${MONTH_NAMES[targetMonth]}`);
+    setFormTerminNotes(notesParts.join(' | '));
     setFormTerminTanggal(`${year}-${monthNum}-${lastDay}`);
   };
 
@@ -2255,8 +2342,71 @@ export const AlihDayaMonitoringView: React.FC = () => {
               </div>
 
               {!editingContract && (
-                <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800">
-                  💡 Termin/tagihan bulanan kontrak baru dibuat secara default nihil (belum terisi). Saat menambahkan termin/tagihan, seluruh data kontrak (GL Account, Pos Anggaran, Vendor, dsb.) akan otomatis disalin ke isian termin.
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">
+                      Pilihan Skema Tagihan Termin Awal:
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Default: Nihil / Belum Ada
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormInitialScheme('nihil')}
+                      className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                        formInitialScheme === 'nihil'
+                          ? 'bg-blue-50 border-blue-500 text-blue-900 font-bold ring-2 ring-blue-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span>Nihil (Default)</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-semibold">0 Termin</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-normal block leading-tight">
+                        Belum ada tagihan. Input tagihan menyalin seluruh data kontrak.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormInitialScheme('sekali_setahun')}
+                      className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                        formInitialScheme === 'sekali_setahun'
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-2 ring-emerald-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span>Sekali dalam 1 Thn</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-semibold">1 Termin</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-700 font-normal block leading-tight">
+                        Ditagihkan 1 kali dalam 1 tahun anggaran (Lumpsum Tahunan).
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormInitialScheme('bulanan')}
+                      className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                        formInitialScheme === 'bulanan'
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-900 font-bold ring-2 ring-indigo-500/20'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span>Rutin Bulanan</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-200 text-indigo-900 font-semibold">12 Termin</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-normal block leading-tight">
+                        Otomatis membuat 12 termin bulanan dari Jan s.d. Des.
+                      </span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -2364,6 +2514,77 @@ export const AlihDayaMonitoringView: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Pilihan Skema Tagihan Termin: Rutin Bulanan vs Ditagihkan Sekali dalam 1 Tahun */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Pilihan Skema Tagihan Termin:</span>
+                  </label>
+                  {currentContractForTermin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTerminModalOpen(false);
+                        setMultiSchemeModal({ isOpen: true, contract: currentContractForTermin });
+                      }}
+                      className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1 hover:underline cursor-pointer"
+                      title="Buka Generator Multi-Termin Otomatis"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Atur Skema Lengkap</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTerminScheme('bulanan')}
+                    className={`px-3 py-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                      formTerminScheme === 'bulanan'
+                        ? 'bg-blue-50 border-blue-500 text-blue-900 font-bold ring-2 ring-blue-500/20'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Rutin Bulanan</span>
+                      {formTerminScheme === 'bulanan' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-normal block mt-0.5">
+                      Tagihan per bulan berjalan (Jan - Des)
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTerminScheme('sekali_setahun')}
+                    className={`px-3 py-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                      formTerminScheme === 'sekali_setahun'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Sekali dalam 1 Tahun</span>
+                      {formTerminScheme === 'sekali_setahun' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-normal block mt-0.5">
+                      Lumpsum / Ditagihkan 1x setahun
+                    </span>
+                  </button>
+                </div>
+
+                {formTerminScheme === 'sekali_setahun' && (
+                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-900 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>
+                      Tagihan ini ditagihkan 1 kali dalam 1 tahun anggaran. Pilih bulan penagihan di bawah (misal: Bulan 12 - Desember).
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {/* Bulan Tagihan Selector */}
               <div>

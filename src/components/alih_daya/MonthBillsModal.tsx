@@ -405,15 +405,43 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Termin Name */}
                       <div className="sm:col-span-2">
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Nama / Uraian Termin Tagihan <span className="text-rose-500">*</span>
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            Nama / Uraian Termin Tagihan <span className="text-rose-500">*</span>
+                          </label>
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
+                                handleBillChange(bIdx, 'terminTagihan', `${contractPrefix}Tagihan Tahunan (Sekali dalam 1 Tahun ${year})`);
+                                handleBillChange(bIdx, 'notes', `Tagihan ditagihkan sekali dalam 1 tahun (${year})`);
+                              }}
+                              className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded hover:bg-emerald-100 font-semibold cursor-pointer"
+                              title="Set uraian tagihan menjadi skema tahunan / sekali dalam 1 tahun"
+                            >
+                              + Skema Sekali 1 Thn
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
+                                handleBillChange(bIdx, 'terminTagihan', `${contractPrefix}Termin ${bIdx + 1} (${MONTH_NAMES[monthIndex]} ${year})`);
+                                handleBillChange(bIdx, 'notes', `Tagihan bulan ${MONTH_NAMES[monthIndex]} ${year}`);
+                              }}
+                              className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded hover:bg-blue-100 font-semibold cursor-pointer"
+                              title="Set uraian tagihan menjadi termin bulanan"
+                            >
+                              + Termin Bulanan
+                            </button>
+                          </div>
+                        </div>
                         <input
                           type="text"
                           required
                           value={bill.terminTagihan || bill.termin || ''}
                           onChange={(e) => handleBillChange(bIdx, 'terminTagihan', e.target.value)}
-                          placeholder="Contoh: Termin 1 (Upah/Gaji Pokok) / Termin 2 (BPJS & Fee)"
+                          placeholder="Contoh: Termin 1 (Upah/Gaji Pokok) / Tagihan Tahunan"
                           className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
