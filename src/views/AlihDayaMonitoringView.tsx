@@ -139,7 +139,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
 
   // Form states for Contract Modal
   const [formNamaKontrak, setFormNamaKontrak] = useState('');
-  const [formNomerKontrak, setFormNomerKontrak] = useState('');
+  const [formnomorKontrak, setFormnomorKontrak] = useState('');
   const [formVendor, setFormVendor] = useState('');
   const [formPosAnggaran, setFormPosAnggaran] = useState<PosType>('Pos 53');
   const [formGLDefault, setFormGLDefault] = useState('');
@@ -316,7 +316,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
 
       // Query check on Contract level
       const matchContractName = (c.namaKontrak || '').toLowerCase().includes(query);
-      const matchContractNum = (c.nomerKontrak || '').toLowerCase().includes(query);
+      const matchContractNum = (c.nomorKontrak || '').toLowerCase().includes(query);
       const matchVendor = (c.vendor || '').toLowerCase().includes(query);
       const matchGL = (c.glAccountDefault || '').toLowerCase().includes(query);
 
@@ -357,7 +357,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
   const handleOpenAddContract = () => {
     setEditingContract(null);
     setFormNamaKontrak('');
-    setFormNomerKontrak('');
+    setFormnomorKontrak('');
     setFormVendor('');
     setFormPosAnggaran('Pos 53');
     setFormGLDefault('6106201700');
@@ -373,7 +373,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
   const handleOpenEditContract = (contract: AlihDayaContract) => {
     setEditingContract(contract);
     setFormNamaKontrak(contract.namaKontrak || '');
-    setFormNomerKontrak(contract.nomerKontrak || '');
+    setFormnomorKontrak(contract.nomorKontrak || '');
     setFormVendor(contract.vendor || '');
     setFormPosAnggaran((contract.posAnggaran || contract.posType || 'Pos 53') as PosType);
     setFormGLDefault(contract.glAccountDefault || '');
@@ -390,26 +390,26 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setContractError(null);
 
     const namaTrim = formNamaKontrak.trim();
-    const nomerTrim = formNomerKontrak.trim();
+    const nomorTrim = formnomorKontrak.trim();
 
     if (!namaTrim) {
       setContractError('Nama Kontrak (No. 1) wajib diisi.');
       return;
     }
-    if (!nomerTrim) {
-      setContractError('Nomer Kontrak (No. 2) wajib diisi.');
+    if (!nomorTrim) {
+      setContractError('Nomor Kontrak (No. 2) wajib diisi.');
       return;
     }
 
-    if (namaTrim.toLowerCase() === nomerTrim.toLowerCase()) {
-      setContractError('Nama Kontrak (1) dan Nomer Kontrak (2) tidak boleh sama persis.');
+    if (namaTrim.toLowerCase() === nomorTrim.toLowerCase()) {
+      setContractError('Nama Kontrak (1) dan nomor Kontrak (2) tidak boleh sama persis.');
       return;
     }
 
     if (editingContract) {
       const res = updateAlihDayaContract(editingContract.id, {
         namaKontrak: namaTrim,
-        nomerKontrak: nomerTrim,
+        nomorKontrak: nomorTrim,
         vendor: formVendor.trim(),
         posAnggaran: formPosAnggaran,
         posType: formPosAnggaran,
@@ -468,7 +468,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
       // Default termin bulanan adalah nihil bila formInitialScheme === 'nihil'
       const res = addAlihDayaContract({
         namaKontrak: namaTrim,
-        nomerKontrak: nomerTrim,
+        nomorKontrak: nomorTrim,
         vendor: formVendor.trim(),
         posAnggaran: formPosAnggaran,
         posType: formPosAnggaran,
@@ -505,12 +505,12 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setFormTerminScheme('bulanan');
 
     // Salin seluruh data dari kontrak ke isian data termin:
-    // 1. Uraian / Nama Termin Tagihan
+    // Uraian / Nama Termin Tagihan
     const terminCount = (contract?.termins?.length || 0) + 1;
     const contractPrefix = contract?.namaKontrak ? `${contract.namaKontrak} - ` : '';
     setFormTerminName(`${contractPrefix}Termin ${terminCount} (${MONTH_NAMES[targetMonth]} ${year})`);
 
-    // 2. Salin GL Account & Nama GL dari data kontrak
+    // Salin GL Account & Nama GL dari data kontrak
     setFormTerminGL(contract?.glAccountDefault || '6106201700');
     setFormTerminGLName(contract?.glAccountNameDefault || contract?.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin');
 
@@ -525,7 +525,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
     const notesParts: string[] = [];
     if (contract?.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
     if (contract?.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-    if (contract?.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    if (contract?.nomorKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomorKontrak.trim()}`);
     setFormTerminNotes(notesParts.length > 0 ? notesParts.join(' | ') : `Tagihan bulan ${MONTH_NAMES[targetMonth]}`);
 
     setTerminError(null);
@@ -568,14 +568,14 @@ export const AlihDayaMonitoringView: React.FC = () => {
       setFormTerminName(`${contractPrefix}Tagihan Tahunan (Sekali dalam 1 Tahun ${year})`);
       const notesParts: string[] = [`Tagihan ditagihkan sekali dalam 1 tahun (${year})`];
       if (contract?.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-      if (contract?.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+      if (contract?.nomorKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomorKontrak.trim()}`);
       setFormTerminNotes(notesParts.join(' | '));
     } else {
       const terminCount = editingTermin ? '' : `${(contract?.termins?.length || 0) + 1}`;
       setFormTerminName(`${contractPrefix}Termin ${terminCount || (formTerminMonthIndex + 1)} (${MONTH_NAMES[formTerminMonthIndex]} ${year})`);
       const notesParts: string[] = [`Tagihan bulan ${MONTH_NAMES[formTerminMonthIndex]}`];
       if (contract?.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-      if (contract?.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+      if (contract?.nomorKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomorKontrak.trim()}`);
       setFormTerminNotes(notesParts.join(' | '));
     }
   };
@@ -609,7 +609,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
     }
     if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
     if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
-    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    if (contract.nomorKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomorKontrak.trim()}`);
     setFormTerminNotes(notesParts.join(' | '));
     setFormTerminTanggal(`${year}-${monthNum}-${lastDay}`);
   };
@@ -1178,7 +1178,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                         <td className="py-3 px-3 sticky left-10 bg-white group-hover:bg-slate-50 z-10 border-r border-slate-100">
                           <div className="font-bold text-slate-900 line-clamp-1">{c.namaKontrak}</div>
                           <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1 mt-0.5">
-                            <span className="bg-slate-100 px-1.5 py-0.2 rounded">{c.nomerKontrak}</span>
+                            <span className="bg-slate-100 px-1.5 py-0.2 rounded">{c.nomorKontrak}</span>
                             {c.vendor && <span className="text-slate-400">· {c.vendor}</span>}
                           </div>
                         </td>
@@ -1442,13 +1442,13 @@ export const AlihDayaMonitoringView: React.FC = () => {
                       </div>
 
                       <div className="space-y-1">
-                        {/* 1. Nama Kontrak & 2. Nomer Kontrak */}
+                        {/* Nama Kontrak & nomor Kontrak */}
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <h2 className="text-base font-bold text-slate-900 tracking-tight">
                             {contract.namaKontrak}
                           </h2>
                           <span className="px-2.5 py-0.5 bg-slate-900 text-white rounded text-xs font-mono font-medium tracking-wide">
-                            No: {contract.nomerKontrak}
+                            No: {contract.nomorKontrak}
                           </span>
                           {(contract.posAnggaran || contract.posType) && (
                             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -1577,11 +1577,11 @@ export const AlihDayaMonitoringView: React.FC = () => {
                           <tr className="bg-slate-100/80 text-slate-700 font-semibold border-b border-slate-200">
                             <th className="py-2 px-3 w-10 text-center">No</th>
                             <th className="py-2 px-3 min-w-[90px]">Bulan Tagihan</th>
-                            <th className="py-2 px-3 min-w-[150px]">4. Termin Tagihan</th>
-                            <th className="py-2 px-3 min-w-[180px]">3. GL Account &amp; Uraian</th>
-                            <th className="py-2 px-3 text-right min-w-[130px]">5. Nominal Tagihan</th>
-                            <th className="py-2 px-3 min-w-[180px]">7. No Dokumen (SAP / MIRO)</th>
-                            <th className="py-2 px-3 min-w-[120px] text-center">6. Status Beban</th>
+                            <th className="py-2 px-3 min-w-[150px]">Termin Tagihan</th>
+                            <th className="py-2 px-3 min-w-[180px]">GL Account &amp; Uraian</th>
+                            <th className="py-2 px-3 text-right min-w-[130px]">Nominal Tagihan</th>
+                            <th className="py-2 px-3 min-w-[180px]">No Dokumen (SAP / MIRO)</th>
+                            <th className="py-2 px-3 min-w-[120px] text-center">Status Beban</th>
                             <th className="py-2 px-3 min-w-[110px]">Keterangan</th>
                             <th className="py-2 px-3 w-20 text-center">Aksi</th>
                           </tr>
@@ -1625,7 +1625,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                                     </span>
                                   </td>
 
-                                  {/* 4. Termin Tagihan */}
+                                  {/* Termin Tagihan */}
                                   <td className="py-2.5 px-3 font-semibold text-slate-900">
                                     <div className="flex items-center gap-1.5">
                                       <span>{termin.terminTagihan || termin.termin || `Termin ${tIdx + 1}`}</span>
@@ -1638,7 +1638,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                                     )}
                                   </td>
 
-                                  {/* 3. GL Account */}
+                                  {/* GL Account */}
                                   <td className="py-2.5 px-3">
                                     <div className="font-mono font-bold text-blue-900 bg-blue-50/80 px-2 py-0.5 rounded inline-block border border-blue-200/60">
                                       {termin.glAccount}
@@ -1650,12 +1650,12 @@ export const AlihDayaMonitoringView: React.FC = () => {
                                     )}
                                   </td>
 
-                                  {/* 5. Nominal Tagihan */}
+                                  {/* Nominal Tagihan */}
                                   <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                                     {formatRupiah(termin.nominalTagihan ?? termin.amount ?? 0)}
                                   </td>
 
-                                  {/* 7. No Dokumen (Direct interactive edit) */}
+                                  {/* No Dokumen (Direct interactive edit) */}
                                   <td className="py-2.5 px-3">
                                     <input
                                       type="text"
@@ -1672,7 +1672,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                                     </span>
                                   </td>
 
-                                  {/* 6. Status Beban */}
+                                  {/* Status Beban */}
                                   <td className="py-2.5 px-3 text-center">
                                     {isTercatat ? (
                                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
@@ -1788,8 +1788,8 @@ export const AlihDayaMonitoringView: React.FC = () => {
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-300">
                   <th className="py-3 px-3 text-center w-12">No</th>
-                  <th className="py-3 px-4 min-w-[200px]">1. Nama Kontrak</th>
-                  <th className="py-3 px-3 min-w-[160px]">2. Nomer Kontrak</th>
+                  <th className="py-3 px-4 min-w-[200px]">Nama Kontrak</th>
+                  <th className="py-3 px-3 min-w-[160px]">nomor Kontrak</th>
                   <th className="py-3 px-3 min-w-[120px]">Vendor</th>
                   <th className="py-3 px-3 min-w-[100px]">Pos</th>
                   {numericMonth !== null && (
@@ -1848,7 +1848,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                         </td>
                         <td className="py-3 px-3 font-mono font-medium text-slate-800">
                           <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                            {c.nomerKontrak}
+                            {c.nomorKontrak}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-slate-700 font-medium">
@@ -1982,13 +1982,13 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-300">
                   <th className="py-2.5 px-3 text-center w-10">No</th>
                   <th className="py-2.5 px-3 min-w-[90px]">Bulan</th>
-                  <th className="py-2.5 px-4 min-w-[170px]">1. Nama Kontrak</th>
-                  <th className="py-2.5 px-3 min-w-[130px]">2. Nomer Kontrak</th>
-                  <th className="py-2.5 px-3 min-w-[140px]">4. Termin Tagihan</th>
-                  <th className="py-2.5 px-3 min-w-[150px]">3. GL Account</th>
-                  <th className="py-2.5 px-3 text-right min-w-[130px]">5. Nominal Tagihan</th>
-                  <th className="py-2.5 px-3 min-w-[180px]">7. No Dokumen (SAP / MIRO)</th>
-                  <th className="py-2.5 px-3 text-center min-w-[110px]">6. Status Beban</th>
+                  <th className="py-2.5 px-4 min-w-[170px]">Nama Kontrak</th>
+                  <th className="py-2.5 px-3 min-w-[130px]">nomor Kontrak</th>
+                  <th className="py-2.5 px-3 min-w-[140px]">Termin Tagihan</th>
+                  <th className="py-2.5 px-3 min-w-[150px]">GL Account</th>
+                  <th className="py-2.5 px-3 text-right min-w-[130px]">Nominal Tagihan</th>
+                  <th className="py-2.5 px-3 min-w-[180px]">No Dokumen (SAP / MIRO)</th>
+                  <th className="py-2.5 px-3 text-center min-w-[110px]">Status Beban</th>
                   <th className="py-2.5 px-3 min-w-[100px]">Jatuh Tempo</th>
                   <th className="py-2.5 px-3 text-center w-16">Aksi</th>
                 </tr>
@@ -2011,7 +2011,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
 
                   if (query) {
                     const matchCName = (item.contract.namaKontrak || '').toLowerCase().includes(query);
-                    const matchCNum = (item.contract.nomerKontrak || '').toLowerCase().includes(query);
+                    const matchCNum = (item.contract.nomorKontrak || '').toLowerCase().includes(query);
                     const matchTName = (item.terminTagihan || item.termin || '').toLowerCase().includes(query);
                     const matchGL = (item.glAccount || '').toLowerCase().includes(query);
                     const matchGLName = (item.glAccountName || '').toLowerCase().includes(query);
@@ -2043,7 +2043,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
                         {item.contract.namaKontrak}
                       </td>
                       <td className="py-2.5 px-3 font-mono font-medium text-slate-700">
-                        {item.contract.nomerKontrak}
+                        {item.contract.nomorKontrak}
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-blue-950">
                         {item.terminTagihan || item.termin || `Termin ${idx + 1}`}
@@ -2150,7 +2150,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  7. Nomor Dokumen SAP / SES / MIRO
+                  Nomor Dokumen SAP / SES / MIRO
                 </label>
                 <input
                   type="text"
@@ -2230,10 +2230,10 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 </div>
               )}
 
-              {/* 1. Nama Kontrak */}
+              {/* Nama Kontrak */}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  1. Nama Kontrak <span className="text-rose-500">*</span>
+                  Nama Kontrak <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -2245,23 +2245,23 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 />
               </div>
 
-              {/* 2. Nomer Kontrak (Must NOT be same as Nama Kontrak) */}
+              {/* nomor Kontrak (Must NOT be same as Nama Kontrak) */}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  2. Nomer Kontrak <span className="text-rose-500">*</span>{' '}
+                  nomor Kontrak <span className="text-rose-500">*</span>{' '}
                   <span className="font-normal text-slate-500">(Wajib unik &amp; berbeda dari Nama Kontrak)</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={formNomerKontrak}
-                  onChange={(e) => setFormNomerKontrak(e.target.value)}
+                  value={formnomorKontrak}
+                  onChange={(e) => setFormnomorKontrak(e.target.value)}
                   placeholder="Contoh: 002.PJ/DAN.02.01/B03000000/2026"
                   className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {formNamaKontrak && formNomerKontrak && formNamaKontrak.trim().toLowerCase() === formNomerKontrak.trim().toLowerCase() && (
+                {formNamaKontrak && formnomorKontrak && formNamaKontrak.trim().toLowerCase() === formnomorKontrak.trim().toLowerCase() && (
                   <p className="text-[11px] text-rose-600 mt-1 font-semibold">
-                    ⚠️ Peringatan: Nama Kontrak dan Nomer Kontrak tidak boleh sama!
+                    ⚠️ Peringatan: Nama Kontrak dan nomor Kontrak tidak boleh sama!
                   </p>
                 )}
               </div>
@@ -2303,7 +2303,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    3. GL Account Default
+                    GL Account Default
                   </label>
                   <input
                     type="text"
@@ -2488,8 +2488,8 @@ export const AlihDayaMonitoringView: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-slate-500">Nomor: </span>
-                      <span className="font-mono font-medium text-slate-900 truncate block" title={currentContractForTermin.nomerKontrak}>
-                        {currentContractForTermin.nomerKontrak}
+                      <span className="font-mono font-medium text-slate-900 truncate block" title={currentContractForTermin.nomorKontrak}>
+                        {currentContractForTermin.nomorKontrak}
                       </span>
                     </div>
                     <div>
@@ -2604,10 +2604,10 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 </select>
               </div>
 
-              {/* 4. Termin Tagihan */}
+              {/* Termin Tagihan */}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  4. Termin Tagihan / Uraian <span className="text-rose-500">*</span>
+                  Termin Tagihan / Uraian <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -2637,11 +2637,11 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 </select>
               </div>
 
-              {/* 3. GL Account & Nama */}
+              {/* GL Account & Nama */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-800 mb-1">
-                    3. GL Account <span className="text-rose-500">*</span>
+                    GL Account <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -2666,10 +2666,10 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 </div>
               </div>
 
-              {/* 5. Nominal Tagihan */}
+              {/* Nominal Tagihan */}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  5. Nominal Tagihan (Rp) <span className="text-rose-500">*</span>
+                  Nominal Tagihan (Rp) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">Rp</span>
@@ -2687,10 +2687,10 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 </div>
               </div>
 
-              {/* 7. No Dokumen (Auto defines 6. Status Beban) */}
+              {/* No Dokumen (Auto defines Status Beban) */}
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  7. No Dokumen (SAP / SPJ / MIRO / SES)
+                  No Dokumen (SAP / SPJ / MIRO / SES)
                 </label>
                 <input
                   type="text"
@@ -2701,10 +2701,10 @@ export const AlihDayaMonitoringView: React.FC = () => {
                 />
               </div>
 
-              {/* 6. Status Beban (Calculated Preview) */}
+              {/* Status Beban (Calculated Preview) */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-slate-700">6. Status Beban (Otomatis):</div>
+                  <div className="text-xs font-bold text-slate-700">Status Beban (Otomatis):</div>
                   <div className="text-[11px] text-slate-500">
                     {formTerminDocNum.trim() !== '' 
                       ? 'No Dokumen terisi \u2192 Beban Tercatat di SAP' 
