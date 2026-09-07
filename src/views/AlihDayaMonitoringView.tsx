@@ -32,7 +32,8 @@ import {
   ChevronRight,
   Table as TableIcon,
   Eye,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Copy
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AlihDayaContract, AlihDayaTermin, StatusBeban, PosType } from '../types';
@@ -152,6 +153,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
   const [formTerminName, setFormTerminName] = useState('');
   const [formTerminGL, setFormTerminGL] = useState('');
   const [formTerminGLName, setFormTerminGLName] = useState('');
+  const [formTerminPosType, setFormTerminPosType] = useState<PosType>('Pos 53');
   const [formTerminNominal, setFormTerminNominal] = useState<number>(0);
   const [formTerminDocNum, setFormTerminDocNum] = useState('');
   const [formTerminTanggal, setFormTerminTanggal] = useState('');
@@ -418,24 +420,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
         return;
       }
     } else {
-      // Create 12 initial monthly termins with month index 0..11
-      const defaultYear = formTahun || selectedYear || 2026;
-      const termins: Omit<AlihDayaTermin, 'id'>[] = MONTH_NAMES.map((mName, idx) => {
-        const monthNum = String(idx + 1).padStart(2, '0');
-        const lastDay = new Date(defaultYear, idx + 1, 0).getDate();
-        return {
-          terminTagihan: `Termin ${idx + 1} (${mName} ${defaultYear})`,
-          bulanIndex: idx,
-          glAccount: formGLDefault.trim() || '6106201700',
-          glAccountName: formGLNameDefault.trim() || 'Beban Jasa Kontrak Rutin',
-          nominalTagihan: 0,
-          documentNumber: '',
-          statusBeban: 'Belum Tercatat',
-          tanggalJatuhTempo: `${defaultYear}-${monthNum}-${lastDay}`,
-          notes: `Tagihan kontrak rutin bulan ${mName}`
-        };
-      });
-
+      // Default termin bulanan adalah nihil (belum terisi / tidak ada termin otomatis)
       const res = addAlihDayaContract({
         namaKontrak: namaTrim,
         nomerKontrak: nomerTrim,
@@ -447,7 +432,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
         tahunAnggaran: formTahun,
         keterangan: formKeterangan.trim(),
         statusKontrak: 'Aktif',
-        termins
+        termins: [] // Nihil / belum terisi termin awal
       });
       if (!res.success) {
         setContractError(res.message || 'Gagal menambahkan kontrak baru.');
@@ -458,39 +443,59 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setIsContractModalOpen(false);
   };
 
-  // Open Termin Modal for Add
+  // Open Termin Modal for Add (Menyalin seluruh data yang sudah ada pada kontrak ke isian termin)
   const handleOpenAddTermin = (contractId: string, prefilledMonthIndex?: number) => {
     const contract = alihDayaContracts.find(c => c.id === contractId);
     const targetMonth = prefilledMonthIndex !== undefined 
       ? prefilledMonthIndex 
       : (numericMonth !== null ? numericMonth : (selectedMonth ?? 0));
     
-    const year = contract?.tahunAnggaran || selectedYear || 2026;
+    const year = contract?.tahunAnggaran || contract?.tahun || selectedYear || 2026;
     const monthNum = String(targetMonth + 1).padStart(2, '0');
     const lastDay = new Date(year, targetMonth + 1, 0).getDate();
 
     setTargetContractIdForTermin(contractId);
     setEditingTermin(null);
     setFormTerminMonthIndex(targetMonth);
-    setFormTerminName(`Termin ${(contract?.termins.length || 0) + 1} (${MONTH_NAMES[targetMonth]} ${year})`);
+
+    // Salin seluruh data dari kontrak ke isian data termin:
+    // 1. Uraian / Nama Termin Tagihan
+    const terminCount = (contract?.termins?.length || 0) + 1;
+    const contractPrefix = contract?.namaKontrak ? `${contract.namaKontrak} - ` : '';
+    setFormTerminName(`${contractPrefix}Termin ${terminCount} (${MONTH_NAMES[targetMonth]} ${year})`);
+
+    // 2. Salin GL Account & Nama GL dari data kontrak
     setFormTerminGL(contract?.glAccountDefault || '6106201700');
-    setFormTerminGLName(contract?.glAccountNameDefault || contract?.glAccountDefaultName || 'Beban Kontrak Rutin');
+    setFormTerminGLName(contract?.glAccountNameDefault || contract?.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin');
+
+    // 3. Salin Kelompok Pos Anggaran dari kontrak
+    setFormTerminPosType((contract?.posAnggaran || contract?.posType || 'Pos 53') as PosType);
+
     setFormTerminNominal(0);
     setFormTerminDocNum('');
     setFormTerminTanggal(`${year}-${monthNum}-${lastDay}`);
-    setFormTerminNotes(`Tagihan bulan ${MONTH_NAMES[targetMonth]}`);
+
+    // 4. Salin Keterangan / Vendor / No Kontrak ke Catatan Termin
+    const notesParts: string[] = [];
+    if (contract?.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
+    if (contract?.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+    if (contract?.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    setFormTerminNotes(notesParts.length > 0 ? notesParts.join(' | ') : `Tagihan bulan ${MONTH_NAMES[targetMonth]}`);
+
     setTerminError(null);
     setIsTerminModalOpen(true);
   };
 
   // Open Termin Modal for Edit
   const handleOpenEditTermin = (contractId: string, termin: AlihDayaTermin) => {
+    const contract = alihDayaContracts.find(c => c.id === contractId);
     setTargetContractIdForTermin(contractId);
     setEditingTermin({ contractId, termin });
     setFormTerminMonthIndex(resolveTerminMonth(termin));
     setFormTerminName(termin.terminTagihan || termin.termin || '');
-    setFormTerminGL(termin.glAccount || '');
-    setFormTerminGLName(termin.glAccountName || '');
+    setFormTerminGL(termin.glAccount || contract?.glAccountDefault || '');
+    setFormTerminGLName(termin.glAccountName || contract?.glAccountNameDefault || contract?.glAccountDefaultName || '');
+    setFormTerminPosType((termin.posType || contract?.posAnggaran || contract?.posType || 'Pos 53') as PosType);
     setFormTerminNominal(termin.nominalTagihan ?? termin.amount ?? 0);
     setFormTerminDocNum(termin.documentNumber || '');
     setFormTerminTanggal(termin.tanggalJatuhTempo || termin.tglTagihan || '');
@@ -499,17 +504,42 @@ export const AlihDayaMonitoringView: React.FC = () => {
     setIsTerminModalOpen(true);
   };
 
+  // Helper: Salin ulang seluruh data kontrak induk ke isian termin modal
+  const handleCopyContractDataToTerminForm = () => {
+    const contract = alihDayaContracts.find(c => c.id === targetContractIdForTermin);
+    if (!contract) return;
+    const year = contract.tahunAnggaran || contract.tahun || selectedYear || 2026;
+    const targetMonth = formTerminMonthIndex;
+    const monthNum = String(targetMonth + 1).padStart(2, '0');
+    const lastDay = new Date(year, targetMonth + 1, 0).getDate();
+    const terminOrder = (contract.termins?.length || 0) + (editingTermin ? 0 : 1);
+
+    setFormTerminName(`${contract.namaKontrak ? `${contract.namaKontrak} - ` : ''}Termin ${terminOrder || 1} (${MONTH_NAMES[targetMonth]} ${year})`);
+    setFormTerminGL(contract.glAccountDefault || '6106201700');
+    setFormTerminGLName(contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin');
+    setFormTerminPosType((contract.posAnggaran || contract.posType || 'Pos 53') as PosType);
+
+    const notesParts: string[] = [];
+    if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
+    if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+    setFormTerminNotes(notesParts.length > 0 ? notesParts.join(' | ') : `Tagihan bulan ${MONTH_NAMES[targetMonth]}`);
+    setFormTerminTanggal(`${year}-${monthNum}-${lastDay}`);
+  };
+
   // Handle Month Change inside Termin Modal
   const handleMonthChangeInTerminModal = (newMonthIndex: number) => {
     setFormTerminMonthIndex(newMonthIndex);
-    const year = selectedYear || 2026;
+    const contract = alihDayaContracts.find(c => c.id === targetContractIdForTermin);
+    const year = contract?.tahunAnggaran || contract?.tahun || selectedYear || 2026;
     const monthNum = String(newMonthIndex + 1).padStart(2, '0');
     const lastDay = new Date(year, newMonthIndex + 1, 0).getDate();
     setFormTerminTanggal(`${year}-${monthNum}-${lastDay}`);
-    if (!formTerminName || formTerminName.startsWith('Termin ')) {
-      const contract = alihDayaContracts.find(c => c.id === targetContractIdForTermin);
-      const terminCount = editingTermin ? '' : `${(contract?.termins.length || 0) + 1}`;
-      setFormTerminName(`Termin ${terminCount ? terminCount : (newMonthIndex + 1)} (${MONTH_NAMES[newMonthIndex]} ${year})`);
+    
+    if (!formTerminName || formTerminName.includes('Termin ')) {
+      const terminCount = editingTermin ? '' : `${(contract?.termins?.length || 0) + 1}`;
+      const contractPrefix = contract?.namaKontrak ? `${contract.namaKontrak} - ` : '';
+      setFormTerminName(`${contractPrefix}Termin ${terminCount ? terminCount : (newMonthIndex + 1)} (${MONTH_NAMES[newMonthIndex]} ${year})`);
     }
   };
 
@@ -540,6 +570,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
         bulanIndex: formTerminMonthIndex,
         glAccount: glTrim,
         glAccountName: formTerminGLName.trim(),
+        posType: formTerminPosType,
         nominalTagihan: Number(formTerminNominal) || 0,
         amount: Number(formTerminNominal) || 0,
         documentNumber: docTrim,
@@ -553,6 +584,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
         bulanIndex: formTerminMonthIndex,
         glAccount: glTrim,
         glAccountName: formTerminGLName.trim(),
+        posType: formTerminPosType,
         nominalTagihan: Number(formTerminNominal) || 0,
         amount: Number(formTerminNominal) || 0,
         documentNumber: docTrim,
@@ -2224,7 +2256,7 @@ export const AlihDayaMonitoringView: React.FC = () => {
 
               {!editingContract && (
                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800">
-                  💡 Kontrak baru akan otomatis dibuatkan slot 12 termin bulanan (Januari s.d. Desember) yang dapat diisi nominal dan nomor dokumennya secara bertahap.
+                  💡 Termin/tagihan bulanan kontrak baru dibuat secara default nihil (belum terisi). Saat menambahkan termin/tagihan, seluruh data kontrak (GL Account, Pos Anggaran, Vendor, dsb.) akan otomatis disalin ke isian termin.
                 </div>
               )}
 
@@ -2251,10 +2283,12 @@ export const AlihDayaMonitoringView: React.FC = () => {
       {/* ========================================================================= */}
       {/* MODAL: TAMBAH / EDIT TERMIN TAGIHAN BULANAN                               */}
       {/* ========================================================================= */}
-      {isTerminModalOpen && (
+      {isTerminModalOpen && (() => {
+        const currentContractForTermin = alihDayaContracts.find(c => c.id === targetContractIdForTermin);
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col">
+            <div className="p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <Layers className="w-5 h-5 text-blue-400" />
                 <h3 className="font-bold text-base">
@@ -2269,11 +2303,65 @@ export const AlihDayaMonitoringView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveTermin} className="p-6 space-y-4">
+            <form onSubmit={handleSaveTermin} className="p-6 space-y-4 overflow-y-auto flex-1">
               {terminError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{terminError}</span>
+                </div>
+              )}
+
+              {/* Data Kontrak Induk Terhubung Banner */}
+              {currentContractForTermin && (
+                <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      <span>Data Kontrak Induk Terhubung</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyContractDataToTerminForm}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-100 border border-blue-300 rounded-md shadow-2xs transition-colors cursor-pointer"
+                      title="Salin ulang seluruh data kontrak ke isian termin ini"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Salin Data Kontrak</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-slate-700 pt-1.5 border-t border-blue-100">
+                    <div>
+                      <span className="text-slate-500">Kontrak: </span>
+                      <span className="font-semibold text-slate-900 truncate block" title={currentContractForTermin.namaKontrak}>
+                        {currentContractForTermin.namaKontrak}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Nomor: </span>
+                      <span className="font-mono font-medium text-slate-900 truncate block" title={currentContractForTermin.nomerKontrak}>
+                        {currentContractForTermin.nomerKontrak}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Vendor: </span>
+                      <span className="font-medium text-slate-900">
+                        {currentContractForTermin.vendor || '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Pos Anggaran: </span>
+                      <span className="font-semibold text-blue-800">
+                        {currentContractForTermin.posAnggaran || currentContractForTermin.posType || 'Pos 53'}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-500">GL Account: </span>
+                      <span className="font-mono font-semibold text-blue-900">{currentContractForTermin.glAccountDefault || '-'}</span>
+                      {(currentContractForTermin.glAccountNameDefault || currentContractForTermin.glAccountDefaultName) && (
+                        <span className="text-slate-600"> - {currentContractForTermin.glAccountNameDefault || currentContractForTermin.glAccountDefaultName}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -2308,6 +2396,24 @@ export const AlihDayaMonitoringView: React.FC = () => {
                   placeholder="Contoh: Termin 1 (Januari 2026)"
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              {/* Pos Anggaran */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Kelompok Pos Anggaran (Disalin dari Kontrak)
+                </label>
+                <select
+                  value={formTerminPosType}
+                  onChange={(e) => setFormTerminPosType(e.target.value as PosType)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="Pos 53">Pos 53 (Beban Pemeliharaan &amp; Jasa)</option>
+                  <option value="Pos 54">Pos 54 (Beban Administrasi &amp; Umum)</option>
+                  <option value="Pos 52">Pos 52 (Beban Operasi / Kepegawaian)</option>
+                  <option value="Beban Sewa">Beban Sewa</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
               </div>
 
               {/* 3. GL Account & Nama */}
@@ -2444,7 +2550,8 @@ export const AlihDayaMonitoringView: React.FC = () => {
             </form>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Month Bills Modal (Managing multiple bills in a month) */}
       {monthBillsModal && monthBillsModal.isOpen && (

@@ -9,7 +9,9 @@ import {
   Layers, 
   CheckCircle2, 
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  FileText
 } from 'lucide-react';
 import { AlihDayaContract, AlihDayaTermin, StatusBeban } from '../../types';
 import { formatRupiah, MONTH_NAMES } from '../../utils/formatters';
@@ -45,21 +47,27 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
       if (monthTermins.length > 0) {
         setBills(JSON.parse(JSON.stringify(monthTermins)));
       } else {
-        // Create initial default bill for this month
+        // Create initial default bill for this month with copied contract data
         const monthNum = String(monthIndex + 1).padStart(2, '0');
         const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+        const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
+        const notesParts: string[] = [];
+        if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
+        if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+        if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+
         const initialBill: AlihDayaTermin = {
           id: `t_ad_new_${Date.now()}_1`,
-          terminTagihan: `Termin 1 (${MONTH_NAMES[monthIndex]} ${year})`,
+          terminTagihan: `${contractPrefix}Termin 1 (${MONTH_NAMES[monthIndex]} ${year})`,
           bulanIndex: monthIndex,
           glAccount: contract.glAccountDefault || '6106201700',
-          glAccountName: contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban jasa borong perlengk Umum',
+          glAccountName: contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
           posType: contract.posAnggaran || contract.posType || 'Pos 53',
           nominalTagihan: 0,
           documentNumber: '',
           statusBeban: 'Belum Tercatat',
           tanggalJatuhTempo: `${year}-${monthNum}-${lastDay}`,
-          notes: `Tagihan bulan ${MONTH_NAMES[monthIndex]}`
+          notes: notesParts.length > 0 ? notesParts.join(' | ') : `Tagihan bulan ${MONTH_NAMES[monthIndex]}`
         };
         setBills([initialBill]);
       }
@@ -97,22 +105,74 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
     const nextNumber = bills.length + 1;
     const monthNum = String(monthIndex + 1).padStart(2, '0');
     const day = nextNumber === 1 ? 15 : new Date(year, monthIndex + 1, 0).getDate();
+    const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
+    const notesParts: string[] = [];
+    if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
+    if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
     
     const newBill: AlihDayaTermin = {
       id: `t_ad_new_${Date.now()}_${nextNumber}`,
-      terminTagihan: `Termin ${nextNumber} (${MONTH_NAMES[monthIndex]} ${year})`,
+      terminTagihan: `${contractPrefix}Termin ${nextNumber} (${MONTH_NAMES[monthIndex]} ${year})`,
       bulanIndex: monthIndex,
       glAccount: contract.glAccountDefault || '6106201700',
-      glAccountName: contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban jasa borong perlengk Umum',
+      glAccountName: contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
       posType: contract.posAnggaran || contract.posType || 'Pos 53',
       nominalTagihan: 0,
       documentNumber: '',
       statusBeban: 'Belum Tercatat',
       tanggalJatuhTempo: `${year}-${monthNum}-${String(day).padStart(2, '0')}`,
-      notes: `Tagihan ke-${nextNumber} bulan ${MONTH_NAMES[monthIndex]}`
+      notes: notesParts.length > 0 ? notesParts.join(' | ') : `Tagihan ke-${nextNumber} bulan ${MONTH_NAMES[monthIndex]}`
     };
 
     setBills(prev => [...prev, newBill]);
+  };
+
+  // Helper: Salin data kontrak induk ke satu tagihan tertentu
+  const handleCopyContractDataToBill = (index: number) => {
+    const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
+    const monthNum = String(monthIndex + 1).padStart(2, '0');
+    const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+    const notesParts: string[] = [];
+    if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
+    if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+
+    setBills(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = {
+        ...next[index],
+        terminTagihan: `${contractPrefix}Termin ${index + 1} (${MONTH_NAMES[monthIndex]} ${year})`,
+        glAccount: contract.glAccountDefault || '6106201700',
+        glAccountName: contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
+        posType: contract.posAnggaran || contract.posType || 'Pos 53',
+        tanggalJatuhTempo: next[index].tanggalJatuhTempo || `${year}-${monthNum}-${lastDay}`,
+        notes: notesParts.length > 0 ? notesParts.join(' | ') : next[index].notes
+      };
+      return next;
+    });
+  };
+
+  // Helper: Salin data kontrak induk ke seluruh tagihan yang ada di bulan ini
+  const handleCopyContractDataToAllBills = () => {
+    const contractPrefix = contract.namaKontrak ? `${contract.namaKontrak} - ` : '';
+    const monthNum = String(monthIndex + 1).padStart(2, '0');
+    const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+    const notesParts: string[] = [];
+    if (contract.keterangan?.trim()) notesParts.push(contract.keterangan.trim());
+    if (contract.vendor?.trim()) notesParts.push(`Vendor: ${contract.vendor.trim()}`);
+    if (contract.nomerKontrak?.trim()) notesParts.push(`No. Kontrak: ${contract.nomerKontrak.trim()}`);
+
+    setBills(prev => prev.map((bill, idx) => ({
+      ...bill,
+      terminTagihan: bill.terminTagihan || `${contractPrefix}Termin ${idx + 1} (${MONTH_NAMES[monthIndex]} ${year})`,
+      glAccount: contract.glAccountDefault || '6106201700',
+      glAccountName: contract.glAccountNameDefault || contract.glAccountDefaultName || 'Beban Jasa Tenaga Kerja Kontrak Rutin',
+      posType: contract.posAnggaran || contract.posType || 'Pos 53',
+      tanggalJatuhTempo: bill.tanggalJatuhTempo || `${year}-${monthNum}-${lastDay}`,
+      notes: notesParts.length > 0 ? notesParts.join(' | ') : bill.notes
+    })));
   };
 
   const handleDeleteBill = (index: number) => {
@@ -227,6 +287,52 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
             </div>
           )}
 
+          {/* Info Kontrak Induk Banner */}
+          <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 text-xs">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span>Data Kontrak Induk Terhubung</span>
+              </div>
+              {bills.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCopyContractDataToAllBills}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-100 border border-blue-300 rounded-md shadow-2xs transition-colors cursor-pointer"
+                  title="Salin ulang data kontrak ke semua isian tagihan bulan ini"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Salin Data Kontrak ke Semua Tagihan</span>
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-700 pt-1 border-t border-blue-100">
+              <div>
+                <span className="text-slate-500">Kontrak:</span>
+                <div className="font-semibold text-slate-900 truncate" title={contract.namaKontrak}>{contract.namaKontrak}</div>
+              </div>
+              <div>
+                <span className="text-slate-500">Nomor:</span>
+                <div className="font-mono font-medium text-slate-900 truncate" title={contract.nomerKontrak}>{contract.nomerKontrak}</div>
+              </div>
+              <div>
+                <span className="text-slate-500">Vendor:</span>
+                <div className="font-medium text-slate-900 truncate">{contract.vendor || '-'}</div>
+              </div>
+              <div>
+                <span className="text-slate-500">Pos Anggaran:</span>
+                <div className="font-semibold text-blue-800">{contract.posAnggaran || contract.posType || 'Pos 53'}</div>
+              </div>
+              <div className="col-span-2 sm:col-span-4">
+                <span className="text-slate-500">GL Account: </span>
+                <span className="font-mono font-semibold text-blue-900">{contract.glAccountDefault || '-'}</span>
+                {(contract.glAccountNameDefault || contract.glAccountDefaultName) && (
+                  <span className="text-slate-600"> - {contract.glAccountNameDefault || contract.glAccountDefaultName}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           {bills.length === 0 ? (
             <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300">
               <Calendar className="w-8 h-8 text-slate-300 mx-auto mb-2" />
@@ -234,10 +340,10 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddBill}
-                className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-1.5"
+                className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Tambah Tagihan Pertama
+                Tambah Tagihan Pertama (Salin Data Kontrak)
               </button>
             </div>
           ) : (
@@ -273,6 +379,16 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
                             Belum Ada No Dokumen
                           </span>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyContractDataToBill(bIdx)}
+                          className="px-2 py-1 text-slate-500 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 rounded text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Salin data kontrak induk ke tagihan ini"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span className="hidden sm:inline">Salin Kontrak</span>
+                        </button>
 
                         <button
                           type="button"
