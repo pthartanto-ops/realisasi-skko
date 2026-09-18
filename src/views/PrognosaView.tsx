@@ -201,7 +201,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
 
     // 1. Prognosa Periode Berjalan (s.d. Bulan Berjalan) = Realisasi SAP s/d Bulan Berjalan + Komitmen Terbuka Periode Berjalan
     const prognosaCurrentMonth = totalRealMTD + totalOpenCommitmentsCurrentMonth;
+    // Estimasi Sisa Bulan Berjalan = Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan
     const deviasiCurrentMonthVsTarget = totalTargetMTD - prognosaCurrentMonth;
+    const estSisaCurrentMonth = totalTargetMTD - prognosaCurrentMonth;
     const serapanCurrentMonthVsPagu = totalPaguAnnual > 0 ? (prognosaCurrentMonth / totalPaguAnnual) * 100 : 0;
     const serapanCurrentMonthVsTarget = totalTargetMTD > 0 ? (prognosaCurrentMonth / totalTargetMTD) * 100 : 0;
 
@@ -246,6 +248,8 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
       const pProgCurrentMonth = pRealMTD + pOpenCurrentMonth;
       const pProgAnnual = pRealMTD + pOpenAll + pEstFuture;
       const pDevAnnual = pAnnual - pProgAnnual;
+      // Estimasi Sisa Bulan Berjalan = Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan
+      const pEstSisaCurrentMonth = pTargetMTD - pProgCurrentMonth;
 
       return {
         pos,
@@ -257,6 +261,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
         documentedCommitment: pDocumented,
         future: pEstFuture,
         progCurrentMonth: pProgCurrentMonth,
+        estSisaCurrentMonth: pEstSisaCurrentMonth,
         prognosaAnnual: pProgAnnual,
         deviasi: pDevAnnual,
         percentageAnnual: pAnnual > 0 ? (pProgAnnual / pAnnual) * 100 : 0,
@@ -274,6 +279,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
       remainingBudgetMonthly,
       prognosaCurrentMonth,
       deviasiCurrentMonthVsTarget,
+      estSisaCurrentMonth,
       serapanCurrentMonthVsPagu,
       serapanCurrentMonthVsTarget,
       totalPrognosaAnnual,
@@ -540,6 +546,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
           <span className="font-bold text-blue-950 block">Ketentuan Perhitungan Nilai Prognosa:</span>
           <p className="text-blue-800/90 leading-relaxed">
             • <strong>Komitmen Terbuka</strong> (belum terbit nomor dokumen) dijumlahkan dengan Realisasi SAP untuk membentuk <strong>Prognosa Periode Berjalan</strong> (s/d {MONTH_NAMES[selectedMonth]}).<br />
+            • <strong>Estimasi Sisa Bulan Berjalan</strong> dihitung dari <strong>Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan</strong>.<br />
             • Komitmen yang <strong>sudah diisi Nomor Dokumen / SPJ</strong> otomatis <strong>dikecualikan dari perhitungan</strong> karena nilainya diasumsikan telah masuk ke dalam Realisasi SAP pembukuan (mencegah double-counting).
           </p>
         </div>
@@ -600,7 +607,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-indigo-200 uppercase tracking-wider">Prognosa Periode Berjalan</span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-800/80 text-indigo-200 border border-indigo-700">
-              s/d {MONTH_SHORT_NAMES[selectedMonth]}
+              {formatPercent(prognosaSummary.serapanCurrentMonthVsTarget, 1)} Target
             </span>
           </div>
           <div className="text-2xl font-extrabold text-indigo-300 mt-2 font-mono">
@@ -610,9 +617,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
             {formatRupiah(prognosaSummary.prognosaCurrentMonth)}
           </span>
           <div className="text-[11px] text-indigo-200/80 mt-2 pt-2 border-t border-indigo-800/80 flex items-center justify-between">
-            <span>% thd Target s/d Bln:</span>
-            <span className="font-bold text-white font-mono">
-              {formatPercent(prognosaSummary.serapanCurrentMonthVsTarget, 1)}
+            <span title="Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">Est. Sisa Bln Berjalan:</span>
+            <span className={`font-bold font-mono ${prognosaSummary.estSisaCurrentMonth >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+              {formatRupiahShort(prognosaSummary.estSisaCurrentMonth)}
             </span>
           </div>
         </div>
@@ -645,7 +652,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
           <div>
             <h3 className="font-bold text-sm text-slate-900">Rincian Prognosa Realisasi per Kelompok POS</h3>
             <p className="text-xs text-slate-500">
-              Kalkulasi: Realisasi SAP s/d {MONTH_NAMES[selectedMonth]} + Komitmen Terbuka Periode Berjalan (Tanpa No. Dokumen)
+              Kalkulasi: Realisasi SAP + Komitmen Terbuka = Prognosa Periode Berjalan | Est. Sisa Bulan Berjalan = Target s.d. Bulan Berjalan − Prognosa Bulan Berjalan
             </p>
           </div>
         </div>
@@ -662,7 +669,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                 <th className="py-3 px-4 text-right bg-indigo-950 text-indigo-200 border-x border-indigo-800">
                   Prognosa Periode Berjalan
                 </th>
-                <th className="py-3 px-4 text-right text-slate-300">Est. Sisa Bln</th>
+                <th className="py-3 px-4 text-right text-amber-200/90" title="Estimasi Sisa Bulan Berjalan = Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">
+                  Est. Sisa Bln Berjalan
+                </th>
                 <th className="py-3 px-4 text-right bg-slate-800 text-white">Prognosa Akhir Thn</th>
                 <th className="py-3 px-4 text-right text-emerald-300">Sisa Pagu</th>
                 <th className="py-3 px-4 text-center font-sans">Status</th>
@@ -694,7 +703,11 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                       {formatPercent(pos.percentageCurrentMonth, 1)} vs Target
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right text-slate-500">{formatRupiah(pos.future)}</td>
+                  <td className={`py-3 px-4 text-right font-bold ${
+                    pos.estSisaCurrentMonth >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                  }`} title={`Target (${formatRupiah(pos.targetMTD)}) - Prognosa (${formatRupiah(pos.progCurrentMonth)})`}>
+                    {formatRupiah(pos.estSisaCurrentMonth)}
+                  </td>
                   <td className="py-3 px-4 text-right font-bold text-slate-900 bg-slate-50">{formatRupiah(pos.prognosaAnnual)}</td>
                   <td className={`py-3 px-4 text-right font-bold ${pos.deviasi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {formatRupiah(pos.deviasi)}
@@ -723,7 +736,11 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                 <td className="py-3 px-4 text-right font-extrabold text-indigo-900 bg-indigo-100/60 border-x border-indigo-200">
                   {formatRupiah(prognosaSummary.prognosaCurrentMonth)}
                 </td>
-                <td className="py-3 px-4 text-right text-slate-600">{formatRupiah(prognosaSummary.remainingBudgetMonthly)}</td>
+                <td className={`py-3 px-4 text-right font-bold ${
+                  prognosaSummary.estSisaCurrentMonth >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                }`} title="Total Target s.d. Bulan Berjalan - Total Prognosa Bulan Berjalan">
+                  {formatRupiah(prognosaSummary.estSisaCurrentMonth)}
+                </td>
                 <td className="py-3 px-4 text-right text-slate-900">{formatRupiah(prognosaSummary.totalPrognosaAnnual)}</td>
                 <td className={`py-3 px-4 text-right ${prognosaSummary.deviasiVsPagu >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                   {formatRupiah(prognosaSummary.deviasiVsPagu)}
@@ -967,6 +984,12 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                         <div className="bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
                           <span className="text-indigo-600 font-sans mr-1 text-[10px] uppercase font-semibold">Prog Bln:</span>
                           <span className="font-extrabold text-indigo-900">{formatRupiah(posGroup.posSummaryItem?.progCurrentMonth || 0)}</span>
+                        </div>
+                        <div className="bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200" title="Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">
+                          <span className="text-slate-500 font-sans mr-1 text-[10px] uppercase font-semibold">Est. Sisa Bln:</span>
+                          <span className={`font-bold ${(posGroup.posSummaryItem?.estSisaCurrentMonth || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {formatRupiah(posGroup.posSummaryItem?.estSisaCurrentMonth || 0)}
+                          </span>
                         </div>
                       </div>
                     </div>
