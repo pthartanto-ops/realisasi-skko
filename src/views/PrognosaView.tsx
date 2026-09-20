@@ -207,8 +207,8 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
     const serapanCurrentMonthVsPagu = totalPaguAnnual > 0 ? (prognosaCurrentMonth / totalPaguAnnual) * 100 : 0;
     const serapanCurrentMonthVsTarget = totalTargetMTD > 0 ? (prognosaCurrentMonth / totalTargetMTD) * 100 : 0;
 
-    // 2. Total Prognosa Akhir Tahun = Realisasi SAP s/d Bulan Berjalan + Seluruh Komitmen Terbuka + Estimasi Rencana Sisa Bulan
-    const totalPrognosaAnnual = totalRealMTD + totalOpenCommitmentsAll + remainingBudgetMonthly;
+    // 2. Total Prognosa Akhir Tahun = Nilai Realisasi Bulan Berjalan + Semua Nilai Kontrak yang Belum Tercatat dalam 1 Tahun
+    const totalPrognosaAnnual = totalRealMTD + totalOpenCommitmentsAll;
     const deviasiVsPagu = totalPaguAnnual - totalPrognosaAnnual;
     const optimasiPct = totalPaguAnnual > 0 ? (totalPrognosaAnnual / totalPaguAnnual) * 100 : 0;
 
@@ -246,7 +246,8 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
         .reduce((s, t) => s + (t.amount || 0), 0);
 
       const pProgCurrentMonth = pRealMTD + pOpenCurrentMonth;
-      const pProgAnnual = pRealMTD + pOpenAll + pEstFuture;
+      // Prognosa Akhir Tahun = Realisasi Bulan Berjalan + Semua Nilai Kontrak Belum Tercatat dalam 1 Tahun
+      const pProgAnnual = pRealMTD + pOpenAll;
       const pDevAnnual = pAnnual - pProgAnnual;
       // Estimasi Sisa Bulan Berjalan = Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan
       const pEstSisaCurrentMonth = pTargetMTD - pProgCurrentMonth;
@@ -547,6 +548,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
           <p className="text-blue-800/90 leading-relaxed">
             • <strong>Komitmen Terbuka</strong> (belum terbit nomor dokumen) dijumlahkan dengan Realisasi SAP untuk membentuk <strong>Prognosa Periode Berjalan</strong> (s/d {MONTH_NAMES[selectedMonth]}).<br />
             • <strong>Estimasi Sisa Bulan Berjalan</strong> dihitung dari <strong>Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan</strong>.<br />
+            • <strong>Prognosa Akhir Tahun</strong> dihitung dari <strong>Nilai Realisasi Bulan Berjalan ditambahkan semua nilai kontrak yang belum tercatat dalam 1 tahun</strong>.<br />
             • Komitmen yang <strong>sudah diisi Nomor Dokumen / SPJ</strong> otomatis <strong>dikecualikan dari perhitungan</strong> karena nilainya diasumsikan telah masuk ke dalam Realisasi SAP pembukuan (mencegah double-counting).
           </p>
         </div>
@@ -627,7 +629,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
         {/* Card 4: Estimasi Prognosa Akhir Tahun */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prognosa Akhir Tahun ({selectedYear})</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider" title="Nilai Realisasi Bulan Berjalan + Semua Nilai Kontrak Belum Tercatat dalam 1 Tahun">
+              Prognosa Akhir Tahun ({selectedYear})
+            </span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
               prognosaSummary.optimasiPct <= 100 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
             }`}>
@@ -637,6 +641,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
           <div className="text-2xl font-extrabold text-slate-900 mt-2 font-mono">
             {formatRupiahShort(prognosaSummary.totalPrognosaAnnual)}
           </div>
+          <span className="text-xs text-slate-400 mt-1 block font-mono">
+            {formatRupiah(prognosaSummary.totalPrognosaAnnual)}
+          </span>
           <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-slate-100">
             <span className="text-slate-500">Estimasi Sisa Pagu:</span>
             <span className={`font-bold font-mono ${prognosaSummary.deviasiVsPagu >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -652,7 +659,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
           <div>
             <h3 className="font-bold text-sm text-slate-900">Rincian Prognosa Realisasi per Kelompok POS</h3>
             <p className="text-xs text-slate-500">
-              Kalkulasi: Realisasi SAP + Komitmen Terbuka = Prognosa Periode Berjalan | Est. Sisa Bulan Berjalan = Target s.d. Bulan Berjalan − Prognosa Bulan Berjalan
+              Kalkulasi: Realisasi SAP + Komitmen Terbuka = Prognosa Periode Berjalan | Prognosa Akhir Tahun = Realisasi Bulan Berjalan + Semua Kontrak Belum Tercatat 1 Tahun | Est. Sisa Bulan Berjalan = Target s.d. Bulan Berjalan − Prognosa Bulan Berjalan
             </p>
           </div>
         </div>
@@ -672,7 +679,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                 <th className="py-3 px-4 text-right text-amber-200/90" title="Estimasi Sisa Bulan Berjalan = Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">
                   Est. Sisa Bln Berjalan
                 </th>
-                <th className="py-3 px-4 text-right bg-slate-800 text-white">Prognosa Akhir Thn</th>
+                <th className="py-3 px-4 text-right bg-slate-800 text-white" title="Prognosa Akhir Tahun = Nilai Realisasi Bulan Berjalan + Semua Nilai Kontrak Belum Tercatat dalam 1 Tahun">
+                  Prognosa Akhir Thn
+                </th>
                 <th className="py-3 px-4 text-right text-emerald-300">Sisa Pagu</th>
                 <th className="py-3 px-4 text-center font-sans">Status</th>
               </tr>
@@ -989,6 +998,12 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                           <span className="text-slate-500 font-sans mr-1 text-[10px] uppercase font-semibold">Est. Sisa Bln:</span>
                           <span className={`font-bold ${(posGroup.posSummaryItem?.estSisaCurrentMonth || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {formatRupiah(posGroup.posSummaryItem?.estSisaCurrentMonth || 0)}
+                          </span>
+                        </div>
+                        <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg shadow-2xs" title="Prognosa Akhir Tahun = Realisasi Bulan Berjalan + Semua Nilai Kontrak Belum Tercatat dalam 1 Tahun">
+                          <span className="text-slate-300 font-sans mr-1 text-[10px] uppercase font-semibold">Prog Thn:</span>
+                          <span className="font-bold text-white">
+                            {formatRupiah(posGroup.posSummaryItem?.prognosaAnnual || 0)}
                           </span>
                         </div>
                       </div>
