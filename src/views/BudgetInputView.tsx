@@ -13,7 +13,9 @@ import {
   RotateCcw,
   CheckSquare,
   Layers,
-  FolderX
+  FolderX,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BudgetItem, PosType } from '../types';
@@ -34,6 +36,7 @@ export const BudgetInputView: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosFilter, setSelectedPosFilter] = useState<string>('ALL');
+  const [hideZeroAccounts, setHideZeroAccounts] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
 
@@ -77,9 +80,30 @@ export const BudgetInputView: React.FC = () => {
     { type: 'Lainnya', label: 'Lainnya / Beban Usaha', defaultCategory: 'Beban Usaha Lainnya' }
   ];
 
+  // Cek apakah akun memiliki nilai pagu atau realisasi bukan nol
+  const isAccountNonZero = (item: BudgetItem): boolean => {
+    if (item.isGroupHeader) {
+      const children = getChildAccountsForHeader(item, budgetItems);
+      return children.some(c => isAccountNonZero(c));
+    }
+    const hasAnnual = Math.abs(item.budgetAnnual || 0) > 0;
+    const hasMonthly = (item.budgetMonthly || []).some(v => Math.abs(v || 0) > 0);
+    const hasReal = (item.realizationMonthly || []).some(v => Math.abs(v || 0) > 0);
+    return hasAnnual || hasMonthly || hasReal;
+  };
+
+  const hiddenZeroCount = useMemo(() => {
+    return budgetItems.filter(i => !i.isGroupHeader && !isAccountNonZero(i)).length;
+  }, [budgetItems]);
+
   // Filtered items
   const filteredItems = useMemo(() => {
     return budgetItems.filter(item => {
+      // Sembunyikan akun bernilai nol bila mode aktif
+      if (hideZeroAccounts && !isAccountNonZero(item)) {
+        return false;
+      }
+
       // Exclude grand headers if filtered, or show all
       if (selectedPosFilter !== 'ALL' && item.posType !== selectedPosFilter) {
         return false;
@@ -93,7 +117,7 @@ export const BudgetInputView: React.FC = () => {
       }
       return true;
     });
-  }, [budgetItems, selectedPosFilter, searchTerm]);
+  }, [budgetItems, selectedPosFilter, searchTerm, hideZeroAccounts]);
 
   // Non-header items in current filter
   const nonHeaderFilteredItems = useMemo(() => {
@@ -352,8 +376,37 @@ export const BudgetInputView: React.FC = () => {
         </div>
 
         {/* Stats strip */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Menampilkan <strong className="text-slate-800">{filteredItems.length}</strong> akun anggaran</span>
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <span>Menampilkan <strong className="text-slate-800">{filteredItems.length}</strong> akun anggaran</span>
+            <button
+              type="button"
+              id="btn-toggle-hide-zero-budget"
+              onClick={() => setHideZeroAccounts(!hideZeroAccounts)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                hideZeroAccounts
+                  ? 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 ring-1 ring-blue-400/20'
+                  : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+              }`}
+              title={
+                hideZeroAccounts
+                  ? `Mode ringkas aktif: Menyembunyikan ${hiddenZeroCount} akun bernilai Rp 0. Klik untuk menampilkan seluruh akun.`
+                  : 'Semua akun ditampilkan. Klik untuk menyembunyikan akun yang bernilai Rp 0.'
+              }
+            >
+              {hideZeroAccounts ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Sembunyikan Akun Nol ({hiddenZeroCount} tersembunyi)</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>Tampilkan Semua Akun</span>
+                </>
+              )}
+            </button>
+          </div>
           <span>Total Pagu Filter: <strong className="text-blue-600 font-mono text-sm">{formatRupiah(totalFilteredBudget)}</strong></span>
         </div>
       </div>

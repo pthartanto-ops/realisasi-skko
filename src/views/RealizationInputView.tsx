@@ -21,7 +21,9 @@ import {
   DollarSign,
   Copy,
   Receipt,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BudgetItem, PosType } from '../types';
@@ -65,6 +67,7 @@ export const RealizationInputView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosFilter, setSelectedPosFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<'all' | 'has_real' | 'zero_real' | 'over_budget'>('all');
+  const [hideZeroAccounts, setHideZeroAccounts] = useState<boolean>(true);
   
   // In-progress local drafts for monthly focus mode: { [itemId]: string }
   const [draftInputs, setDraftInputs] = useState<Record<string, string>>({});
@@ -109,9 +112,30 @@ export const RealizationInputView: React.FC = () => {
     return budgetItems.filter(item => !item.isGroupHeader);
   }, [budgetItems]);
 
-  // Filtered items based on POS, search term, and status
+  // Cek apakah akun memiliki nilai aktif (pagu atau realisasi bukan nol)
+  const isAccountNonZero = (item: BudgetItem): boolean => {
+    if (item.isGroupHeader) {
+      const children = getChildAccountsForHeader(item, budgetItems);
+      return children.some(c => isAccountNonZero(c));
+    }
+    const hasAnnualBudget = Math.abs(item.budgetAnnual || 0) > 0;
+    const hasMonthlyBudget = (item.budgetMonthly || []).some(v => Math.abs(v || 0) > 0);
+    const hasReal = (item.realizationMonthly || []).some(v => Math.abs(v || 0) > 0);
+    return hasAnnualBudget || hasMonthlyBudget || hasReal;
+  };
+
+  const hiddenZeroCount = useMemo(() => {
+    return nonHeaderAccounts.filter(item => !isAccountNonZero(item)).length;
+  }, [nonHeaderAccounts, budgetItems]);
+
+  // Filtered items based on POS, search term, status, and zero hiding
   const filteredItems = useMemo(() => {
     return budgetItems.filter(item => {
+      // Sembunyikan akun nol bila mode aktif
+      if (hideZeroAccounts && !isAccountNonZero(item)) {
+        return false;
+      }
+
       // POS Filter
       if (selectedPosFilter !== 'ALL' && item.posType !== selectedPosFilter) {
         return false;
@@ -139,7 +163,7 @@ export const RealizationInputView: React.FC = () => {
 
       return true;
     });
-  }, [budgetItems, selectedPosFilter, searchTerm, statusFilter, focusMonth]);
+  }, [budgetItems, selectedPosFilter, searchTerm, statusFilter, focusMonth, hideZeroAccounts]);
 
   // Metrics for Top Summary Bar
   const totalAnnualBudget = useMemo(() => {
@@ -547,6 +571,40 @@ export const RealizationInputView: React.FC = () => {
                   <option value="over_budget">Realisasi &gt; Pagu Tahunan</option>
                 </select>
               </div>
+
+              {/* Toggle Sembunyikan Akun Bernilai Nol */}
+              <button
+                type="button"
+                id="btn-toggle-hide-zero-realization"
+                onClick={() => setHideZeroAccounts(!hideZeroAccounts)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs border ${
+                  hideZeroAccounts
+                    ? 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 ring-1 ring-blue-400/20'
+                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                }`}
+                title={
+                  hideZeroAccounts
+                    ? `Mode ringkas aktif: Menyembunyikan ${hiddenZeroCount} akun bernilai Rp 0. Klik untuk menampilkan seluruh akun.`
+                    : 'Semua akun ditampilkan. Klik untuk menyembunyikan akun yang bernilai Rp 0.'
+                }
+              >
+                {hideZeroAccounts ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Sembunyikan Akun Nol</span>
+                    {hiddenZeroCount > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-200/80 text-blue-800 font-bold ml-0.5">
+                        {hiddenZeroCount} tersembunyi
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span>Tampilkan Semua</span>
+                  </>
+                )}
+              </button>
             </div>
 
             {/* POS Filter Chips */}
