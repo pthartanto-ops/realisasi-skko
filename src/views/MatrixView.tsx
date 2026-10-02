@@ -8,11 +8,14 @@ import {
   TrendingUp, 
   Eye, 
   SlidersHorizontal,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Calculator,
+  Info
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useApp } from '../context/AppContext';
-import { BudgetItem, PosType } from '../types';
+import { BudgetItem, PosType, AdditionalTransaction } from '../types';
+import { getChildAccountsForHeader } from '../utils/budgetCalculations';
 import { 
   formatRupiah, 
   formatRupiahShort, 
@@ -26,6 +29,7 @@ type MatrixMode = 'summary_mtd' | 'monthly_realization' | 'monthly_target_vs_rea
 export const MatrixView: React.FC = () => {
   const { 
     budgetItems, 
+    additionalTransactions,
     selectedYear, 
     selectedMonth, 
     setSelectedMonth 
@@ -34,6 +38,54 @@ export const MatrixView: React.FC = () => {
   const [matrixMode, setMatrixMode] = useState<MatrixMode>('summary_mtd');
   const [selectedPos, setSelectedPos] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Helper check if transaction is already booked/documented
+  const hasDocNumber = (t: AdditionalTransaction): boolean => {
+    return !!(t.documentNumber && t.documentNumber.trim().length > 0);
+  };
+
+  // Open commitments (belum tercatat / belum terbit SPJ) for current running month
+  const openCommitmentsCurrentMonth = useMemo(() => {
+    return (additionalTransactions || []).filter(t => 
+      t.isActive && 
+      !hasDocNumber(t) &&
+      (t.month === undefined || t.month === selectedMonth)
+    );
+  }, [additionalTransactions, selectedMonth]);
+
+  // Compute open commitment / prognosa amount for an individual item or group header for selectedMonth
+  const getItemPrognosaCurrentMonth = (item: BudgetItem): number => {
+    if (!item.isGroupHeader) {
+      // Individual GL item: match by glAccount matching item.code or item.id
+      return openCommitmentsCurrentMonth
+        .filter(t => t.glAccount === item.code || t.glAccount === item.id)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+    } else {
+      // Group header: sum of all child accounts under this header
+      const children = getChildAccountsForHeader(item, budgetItems);
+      const childCodes = new Set(children.map(c => c.code));
+      const childIds = new Set(children.map(c => c.id));
+
+      let total = openCommitmentsCurrentMonth
+        .filter(t => t.glAccount && (childCodes.has(t.glAccount) || childIds.has(t.glAccount)))
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+      // For level 0 POS headers (or grand total), also include unassigned commitments for this posType
+      if (item.level === 0) {
+        const unassigned = openCommitmentsCurrentMonth
+          .filter(t => {
+            const matchesPos = (item.code === 'CODE_1' || (item.name || '').toLowerCase().includes('beban usaha'))
+              ? true
+              : (t.posType === item.posType || (item.posType === 'Beban Sewa' && (t.posType as string) === 'Sewa Non AHG'));
+            const isAssigned = t.glAccount && (childCodes.has(t.glAccount) || childIds.has(t.glAccount));
+            return matchesPos && !isAssigned;
+          })
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
+        total += unassigned;
+      }
+      return total;
+    }
+  };
 
   const filteredItems = useMemo(() => {
     return budgetItems.filter(item => {
@@ -53,6 +105,16 @@ export const MatrixView: React.FC = () => {
       return true;
     });
   }, [budgetItems, selectedPos, searchTerm]);
+
+  // Total open commitments for the currently filtered view
+  const totalOpenCommitmentsCurrentMonth = useMemo(() => {
+    if (selectedPos === 'ALL') {
+      return openCommitmentsCurrentMonth.reduce((sum, t) => sum + (t.amount || 0), 0);
+    }
+    return openCommitmentsCurrentMonth
+      .filter(t => t.posType === selectedPos || (selectedPos === 'Beban Sewa' && (t.posType as string) === 'Sewa Non AHG'))
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+  }, [openCommitmentsCurrentMonth, selectedPos]);
 
   // Aggregate totals
   const totals = useMemo(() => {
@@ -82,7 +144,11 @@ export const MatrixView: React.FC = () => {
       }
     });
 
-    const sisaPagu = totalAnnual - realMTD;
+    const prognosaMTD = totalOpenCommitmentsCurrentMonth;
+    // Sisa pagu bulan berjalan = target bulan berjalan dikurangi realisasi bulan berjalan dikurangi prognosa bulan berjalan
+    const sisaPaguBulanBerjalan = targetMTD - realMTD - prognosaMTD;
+    const sisaPaguAnnual = totalAnnual - realMTD;
+
     const penyerapanTahunanPct = totalAnnual > 0 ? (realMTD / totalAnnual) * 100 : 0;
     const penyerapanSdMonthPct = targetMTD > 0 ? (realMTD / targetMTD) * 100 : 0;
 
@@ -90,13 +156,15 @@ export const MatrixView: React.FC = () => {
       totalAnnual,
       targetMTD,
       realMTD,
-      sisaPagu,
+      prognosaMTD,
+      sisaPaguBulanBerjalan,
+      sisaPaguAnnual,
       penyerapanTahunanPct,
       penyerapanSdMonthPct,
       monthlyRealizationTotals,
       monthlyBudgetTotals
     };
-  }, [filteredItems, selectedMonth]);
+  }, [filteredItems, selectedMonth, totalOpenCommitmentsCurrentMonth]);
 
   // Export Matrix to Excel
   const handleExportExcel = () => {
@@ -104,17 +172,22 @@ export const MatrixView: React.FC = () => {
 
     if (matrixMode === 'summary_mtd') {
       wsData.push([
-        `MATRIKS REALISASI ANGGARAN S/D ${MONTH_NAMES[selectedMonth].toUpperCase()} ${selectedYear}`,
-        '', '', '', '', '', '', '', ''
+        `MATRIKS REALISASI ANGGARAN & PROGNOSA S/D ${MONTH_NAMES[selectedMonth].toUpperCase()} ${selectedYear}`,
+        '', '', '', '', '', '', '', '', '', ''
+      ]);
+      wsData.push([
+        'Rumus: Sisa Pagu Bulan Berjalan = Target s.d. Bulan Berjalan - Realisasi s.d. Bulan Berjalan - Prognosa Bulan Berjalan'
       ]);
       wsData.push([
         'NO', 'KODE GL', 'URAIAN AKUN', 'KELOMPOK POS', 
         `PAGU ANGGARAN ${selectedYear}`, 
         `TARGET S/D ${MONTH_SHORT_NAMES[selectedMonth]}`, 
         `REALISASI S/D ${MONTH_SHORT_NAMES[selectedMonth]}`, 
-        `SISA PAGU`, 
-        `% REAL THD ANGG S/D BLN`,
-        `% REAL THD ANGG 1 THN`
+        `PROGNOSA BLN BERJALAN`,
+        `SISA PAGU BULAN BERJALAN`, 
+        `SISA PAGU 1 TAHUN`, 
+        `% REAL THD TARGET S/D BLN`,
+        `% REAL THD PAGU 1 THN`
       ]);
 
       filteredItems.forEach((item, idx) => {
@@ -124,7 +197,12 @@ export const MatrixView: React.FC = () => {
           rMTD += item.realizationMonthly?.[m] || 0;
           bMTD += item.budgetMonthly?.[m] || 0;
         }
-        const sisa = item.budgetAnnual - rMTD;
+
+        const progItem = getItemPrognosaCurrentMonth(item);
+        // Sisa pagu bulan berjalan = target s.d. bulan berjalan dikurangi realisasi s.d. bulan berjalan dikurangi prognosa bulan berjalan
+        const sisaBlnBerjalan = bMTD - rMTD - progItem;
+        const sisaTahunan = item.budgetAnnual - rMTD;
+
         const pctTahunan = item.budgetAnnual > 0 ? (rMTD / item.budgetAnnual) * 100 : 0;
         const pctMTD = bMTD > 0 ? (rMTD / bMTD) * 100 : 0;
 
@@ -136,7 +214,9 @@ export const MatrixView: React.FC = () => {
           item.budgetAnnual,
           bMTD,
           rMTD,
-          sisa,
+          progItem,
+          sisaBlnBerjalan,
+          sisaTahunan,
           `${pctMTD.toFixed(2)}%`,
           `${pctTahunan.toFixed(2)}%`
         ]);
@@ -202,7 +282,7 @@ export const MatrixView: React.FC = () => {
           <div>
             <h1 className="text-xl font-bold text-slate-900">Matriks Pemantauan Realisasi Anggaran</h1>
             <p className="text-xs text-slate-500">
-              Tabel matriks komprehensif data rencana anggaran dan realisasi bulanan
+              Tabel matriks komprehensif rencana anggaran, realisasi s/d cut-off, komitmen prognosa, dan sisa pagu bulan berjalan
             </p>
           </div>
         </div>
@@ -268,7 +348,7 @@ export const MatrixView: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter bar */}
+        {/* Filter bar & Rule Hint */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -298,10 +378,22 @@ export const MatrixView: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* Formula Information Note */}
+        <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg px-3.5 py-2 flex items-center gap-2 text-[11px] text-amber-900">
+          <Info className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            <strong>Formula Sisa Pagu Bulan Berjalan</strong> = 
+            <span className="font-mono font-semibold ml-1">Target Bulan Berjalan</span> − 
+            <span className="font-mono font-semibold ml-1">Realisasi Bulan Berjalan</span> − 
+            <span className="font-mono font-semibold ml-1">Prognosa Bulan Berjalan</span>
+            <span className="text-amber-700 ml-1.5">(komitmen/kontrak terbuka yang belum terbit SPJ/dokumen)</span>.
+          </span>
+        </div>
       </div>
 
       {/* Summary Metrics Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-xs">
           <span className="text-slate-400 block text-[11px]">Total Pagu (1 Thn)</span>
           <span className="font-bold text-slate-900 text-sm font-mono">{formatRupiahShort(totals.totalAnnual)}</span>
@@ -314,16 +406,37 @@ export const MatrixView: React.FC = () => {
           <span className="text-slate-400 block text-[11px]">Realisasi s/d {MONTH_SHORT_NAMES[selectedMonth]}</span>
           <span className="font-bold text-blue-600 text-sm font-mono">{formatRupiahShort(totals.realMTD)}</span>
         </div>
+        <div className="bg-white p-3 rounded-xl border border-purple-100 bg-purple-50/20 shadow-sm text-xs">
+          <span className="text-purple-600 block text-[11px] font-semibold" title="Total komitmen/kontrak terbuka bulan berjalan">Prognosa Bln Berjalan</span>
+          <span className="font-bold text-purple-700 text-sm font-mono">{formatRupiahShort(totals.prognosaMTD)}</span>
+        </div>
+        <div className={`p-3 rounded-xl border shadow-sm text-xs ${
+          totals.sisaPaguBulanBerjalan >= 0 
+            ? 'bg-amber-50/50 border-amber-300/80 text-amber-950 ring-1 ring-amber-400/20' 
+            : 'bg-rose-50/50 border-rose-300 text-rose-950'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="block text-[11px] font-bold text-amber-900" title="Target s.d. Bulan Berjalan dikurangi Realisasi s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">
+              Sisa Pagu Bln Berjalan
+            </span>
+            <Calculator className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+          </div>
+          <span className={`font-black text-sm font-mono block mt-0.5 ${
+            totals.sisaPaguBulanBerjalan >= 0 ? 'text-amber-800' : 'text-rose-600'
+          }`}>
+            {formatRupiahShort(totals.sisaPaguBulanBerjalan)}
+          </span>
+        </div>
         <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-xs">
-          <span className="text-slate-400 block text-[11px]">Sisa Pagu Anggaran</span>
-          <span className="font-bold text-amber-600 text-sm font-mono">{formatRupiahShort(totals.sisaPagu)}</span>
+          <span className="text-slate-400 block text-[11px]">Sisa Pagu 1 Tahun</span>
+          <span className="font-bold text-slate-700 text-sm font-mono">{formatRupiahShort(totals.sisaPaguAnnual)}</span>
         </div>
         <div className="bg-white p-3 rounded-xl border border-indigo-100 bg-indigo-50/30 shadow-sm text-xs">
-          <span className="text-indigo-700 block text-[11px] font-semibold">% Real thd Angg s.d. Bln</span>
+          <span className="text-indigo-700 block text-[11px] font-semibold">% Real thd Target Bln</span>
           <span className="font-bold text-indigo-700 text-sm">{formatPercent(totals.penyerapanSdMonthPct)}</span>
         </div>
         <div className="bg-white p-3 rounded-xl border border-emerald-100 bg-emerald-50/30 shadow-sm text-xs">
-          <span className="text-emerald-700 block text-[11px] font-semibold">% Real thd Angg 1 Thn</span>
+          <span className="text-emerald-700 block text-[11px] font-semibold">% Real thd Pagu 1 Thn</span>
           <span className="font-bold text-emerald-700 text-sm">{formatPercent(totals.penyerapanTahunanPct)}</span>
         </div>
       </div>
@@ -342,7 +455,14 @@ export const MatrixView: React.FC = () => {
                   <th className="py-3 px-3 text-right">Pagu SKKO ({selectedYear})</th>
                   <th className="py-3 px-3 text-right">Target s/d {MONTH_SHORT_NAMES[selectedMonth]}</th>
                   <th className="py-3 px-3 text-right bg-slate-800 text-blue-300">Realisasi s/d {MONTH_SHORT_NAMES[selectedMonth]}</th>
-                  <th className="py-3 px-3 text-right text-amber-300">Sisa Pagu</th>
+                  <th className="py-3 px-3 text-right bg-purple-950/80 text-purple-200" title="Komitmen terbuka bulan berjalan yang belum tercatat dokumen SPJ">
+                    Prog Bln Berjalan
+                  </th>
+                  <th className="py-3 px-3 text-right bg-amber-950/90 text-amber-300 border-x border-slate-800" title="Target s.d. Bulan Berjalan dikurangi Realisasi s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">
+                    <span className="block">Sisa Pagu</span>
+                    <span className="text-[9px] text-amber-200 font-normal">Bln Berjalan</span>
+                  </th>
+                  <th className="py-3 px-3 text-right text-slate-300">Sisa Pagu 1 Thn</th>
                   <th className="py-3 px-3 text-center bg-indigo-950 text-indigo-200 border-x border-slate-800">
                     <span className="block">% Real thd</span>
                     <span className="text-[9px] text-indigo-300">Angg s/d Bln</span>
@@ -425,7 +545,12 @@ export const MatrixView: React.FC = () => {
                   }
                 }
 
-                const sisaPagu = item.budgetAnnual - rMTD;
+                // Prognosa & Sisa Pagu Bulan Berjalan
+                const prognosaItem = getItemPrognosaCurrentMonth(item);
+                // Sisa pagu bulan berjalan = target bulan berjalan dikurangi realisasi bulan berjalan dikurangi prognosa bulan berjalan
+                const sisaPaguBulanBerjalanItem = bMTD - rMTD - prognosaItem;
+                const sisaPaguAnnualItem = item.budgetAnnual - rMTD;
+
                 const serapTahunanPct = item.budgetAnnual > 0 ? (rMTD / item.budgetAnnual) * 100 : 0;
                 const serapSdMonthPct = bMTD > 0 ? (rMTD / bMTD) * 100 : 0;
 
@@ -442,7 +567,13 @@ export const MatrixView: React.FC = () => {
                           <td className="py-2.5 px-3 text-right">{formatRupiah(item.budgetAnnual)}</td>
                           <td className="py-2.5 px-3 text-right">{formatRupiah(bMTD)}</td>
                           <td className="py-2.5 px-3 text-right bg-slate-200 text-blue-800">{formatRupiah(rMTD)}</td>
-                          <td className="py-2.5 px-3 text-right text-amber-700">{formatRupiah(sisaPagu)}</td>
+                          <td className="py-2.5 px-3 text-right text-purple-700 bg-purple-50/50">{formatRupiah(prognosaItem)}</td>
+                          <td className={`py-2.5 px-3 text-right bg-amber-50/70 border-x border-amber-200 ${
+                            sisaPaguBulanBerjalanItem < 0 ? 'text-rose-700 font-extrabold' : 'text-amber-800'
+                          }`}>
+                            {formatRupiah(sisaPaguBulanBerjalanItem)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-slate-700">{formatRupiah(sisaPaguAnnualItem)}</td>
                           <td className="py-2.5 px-3 text-center text-indigo-800 bg-indigo-50/50">{formatPercent(serapSdMonthPct)}</td>
                           <td className="py-2.5 px-3 text-center text-emerald-800 bg-emerald-50/50">{formatPercent(serapTahunanPct)}</td>
                         </>
@@ -479,9 +610,28 @@ export const MatrixView: React.FC = () => {
                         <td className="py-2.5 px-3 text-right text-slate-800 font-semibold">{formatRupiah(item.budgetAnnual)}</td>
                         <td className="py-2.5 px-3 text-right text-slate-600">{formatRupiah(bMTD)}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-blue-700 bg-blue-50/50">{formatRupiah(rMTD)}</td>
-                        <td className={`py-2.5 px-3 text-right font-semibold ${sisaPagu < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
-                          {formatRupiah(sisaPagu)}
+                        
+                        {/* Prognosa Bulan Berjalan */}
+                        <td className={`py-2.5 px-3 text-right ${prognosaItem > 0 ? 'font-semibold text-purple-700 bg-purple-50/30' : 'text-slate-400'}`}>
+                          {formatRupiah(prognosaItem)}
                         </td>
+
+                        {/* Sisa Pagu Bulan Berjalan = Target - Realisasi - Prognosa */}
+                        <td className={`py-2.5 px-3 text-right font-bold border-x border-amber-100 ${
+                          sisaPaguBulanBerjalanItem < 0 
+                            ? 'text-rose-600 bg-rose-50/40' 
+                            : 'text-amber-800 bg-amber-50/30'
+                        }`}
+                        title={`Target (${formatRupiah(bMTD)}) - Realisasi (${formatRupiah(rMTD)}) - Prognosa (${formatRupiah(prognosaItem)}) = ${formatRupiah(sisaPaguBulanBerjalanItem)}`}
+                        >
+                          {formatRupiah(sisaPaguBulanBerjalanItem)}
+                        </td>
+
+                        {/* Sisa Pagu 1 Tahun */}
+                        <td className={`py-2.5 px-3 text-right font-medium ${sisaPaguAnnualItem < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
+                          {formatRupiah(sisaPaguAnnualItem)}
+                        </td>
+
                         <td className="py-2.5 px-3 text-center font-sans font-bold text-indigo-700 bg-indigo-50/30 border-x border-slate-100">
                           {formatPercent(serapSdMonthPct)}
                         </td>
@@ -553,7 +703,13 @@ export const MatrixView: React.FC = () => {
                     <td className="py-3 px-3 text-right font-mono">{formatRupiah(totals.totalAnnual)}</td>
                     <td className="py-3 px-3 text-right font-mono">{formatRupiah(totals.targetMTD)}</td>
                     <td className="py-3 px-3 text-right font-mono bg-slate-800 text-blue-300">{formatRupiah(totals.realMTD)}</td>
-                    <td className="py-3 px-3 text-right font-mono text-amber-300">{formatRupiah(totals.sisaPagu)}</td>
+                    <td className="py-3 px-3 text-right font-mono bg-purple-950/80 text-purple-200">{formatRupiah(totals.prognosaMTD)}</td>
+                    <td className={`py-3 px-3 text-right font-mono bg-amber-950 text-amber-300 border-x border-slate-800 ${
+                      totals.sisaPaguBulanBerjalan < 0 ? 'text-rose-300' : ''
+                    }`}>
+                      {formatRupiah(totals.sisaPaguBulanBerjalan)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-slate-300">{formatRupiah(totals.sisaPaguAnnual)}</td>
                     <td className="py-3 px-3 text-center font-sans text-indigo-300 bg-slate-950 border-x border-slate-800">{formatPercent(totals.penyerapanSdMonthPct)}</td>
                     <td className="py-3 px-3 text-center font-sans text-emerald-300 bg-slate-950">{formatPercent(totals.penyerapanTahunanPct)}</td>
                   </>
