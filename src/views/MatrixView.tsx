@@ -131,6 +131,34 @@ export const MatrixView: React.FC = () => {
     }
   };
 
+  // Helper to generate tooltip showing breakdown of transactions contributing to prognosa
+  const getPrognosaTooltip = (item: BudgetItem, isAnnual: boolean): string | undefined => {
+    const list = isAnnual ? openCommitmentsAnnual : openCommitmentsCurrentMonth;
+    let matched: AdditionalTransaction[] = [];
+    if (!item.isGroupHeader) {
+      matched = list.filter(t => t.glAccount === item.code || t.glAccount === item.id);
+    } else {
+      const children = getChildAccountsForHeader(item, budgetItems);
+      const childCodes = new Set(children.map(c => c.code));
+      const childIds = new Set(children.map(c => c.id));
+      matched = list.filter(t => {
+        const isAssigned = t.glAccount && (childCodes.has(t.glAccount) || childIds.has(t.glAccount));
+        if (item.level === 0) {
+          const matchesPos = (item.code === 'CODE_1' || (item.name || '').toLowerCase().includes('beban usaha'))
+            ? true
+            : (t.posType === item.posType || (item.posType === 'Beban Sewa' && (t.posType as string) === 'Sewa Non AHG'));
+          return isAssigned || matchesPos;
+        }
+        return isAssigned;
+      });
+    }
+
+    if (matched.length === 0) return undefined;
+    const headerTitle = `Rincian Komitmen Terbuka ${isAnnual ? '1 Tahun' : `s.d. ${MONTH_SHORT_NAMES[selectedMonth]}`} [${item.code || '-'}] ${item.name}:`;
+    const details = matched.map((t, i) => `${i + 1}. ${t.name} (GL: ${t.glAccount || '-'}) = ${formatRupiah(t.amount || 0)}`);
+    return `${headerTitle}\n${details.join('\n')}`;
+  };
+
   // Mengecek apakah suatu akun memiliki nilai (bukan nol).
   // Akun dikatakan ada isinya jika memiliki pagu tahunan, target bulanan, realisasi bulanan, atau prognosa komitmen.
   // Jika di kemudian hari akun tersebut diisi data, fungsi ini otomatis mengembalikan true sehingga akun ditampilkan kembali.
@@ -799,13 +827,23 @@ export const MatrixView: React.FC = () => {
                             <td className="py-2.5 px-3 text-right">{formatRupiah(item.budgetAnnual)}</td>
                             <td className="py-2.5 px-3 text-right">{formatRupiah(bMTD)}</td>
                             <td className="py-2.5 px-3 text-right bg-slate-200 text-blue-800">{formatRupiah(rMTD)}</td>
-                            <td className="py-2.5 px-3 text-right text-purple-700 bg-purple-50/50">{formatRupiah(prognosaItem)}</td>
+                            <td 
+                              className="py-2.5 px-3 text-right text-purple-700 bg-purple-50/50 cursor-help"
+                              title={getPrognosaTooltip(item, false)}
+                            >
+                              {formatRupiah(prognosaItem)}
+                            </td>
                             <td className={`py-2.5 px-3 text-right bg-amber-50/70 border-x border-amber-200 ${
                               sisaPaguBulanBerjalanItem < 0 ? 'text-rose-700 font-extrabold' : 'text-amber-800'
                             }`}>
                               {formatRupiah(sisaPaguBulanBerjalanItem)}
                             </td>
-                            <td className="py-2.5 px-3 text-right text-purple-700 bg-purple-50/40">{formatRupiah(prognosaAnnualItem)}</td>
+                            <td 
+                              className="py-2.5 px-3 text-right text-purple-700 bg-purple-50/40 cursor-help"
+                              title={getPrognosaTooltip(item, true)}
+                            >
+                              {formatRupiah(prognosaAnnualItem)}
+                            </td>
                             <td className={`py-2.5 px-3 text-right bg-amber-50/50 border-r border-amber-200 ${
                               sisaPaguAnnualItem < 0 ? 'text-rose-700 font-extrabold' : 'text-slate-800'
                             }`}>
@@ -859,7 +897,10 @@ export const MatrixView: React.FC = () => {
                           <td className="py-2.5 px-3 text-right font-bold text-blue-700 bg-blue-50/50">{formatRupiah(rMTD)}</td>
                           
                           {/* Prognosa Bulan Berjalan */}
-                          <td className={`py-2.5 px-3 text-right ${prognosaItem > 0 ? 'font-semibold text-purple-700 bg-purple-50/30' : 'text-slate-400'}`}>
+                          <td 
+                            className={`py-2.5 px-3 text-right cursor-help ${prognosaItem > 0 ? 'font-semibold text-purple-700 bg-purple-50/30' : 'text-slate-400'}`}
+                            title={getPrognosaTooltip(item, false)}
+                          >
                             {formatRupiah(prognosaItem)}
                           </td>
 
@@ -875,7 +916,10 @@ export const MatrixView: React.FC = () => {
                           </td>
 
                           {/* Prognosa 1 Tahun */}
-                          <td className={`py-2.5 px-3 text-right ${prognosaAnnualItem > 0 ? 'font-semibold text-purple-700 bg-purple-50/20' : 'text-slate-400'}`}>
+                          <td 
+                            className={`py-2.5 px-3 text-right cursor-help ${prognosaAnnualItem > 0 ? 'font-semibold text-purple-700 bg-purple-50/20' : 'text-slate-400'}`}
+                            title={getPrognosaTooltip(item, true)}
+                          >
                             {formatRupiah(prognosaAnnualItem)}
                           </td>
 
