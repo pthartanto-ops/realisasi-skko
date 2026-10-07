@@ -48,11 +48,13 @@ export const MatrixView: React.FC = () => {
   };
 
   // Open commitments (belum tercatat / belum terbit SPJ) for current running month
+  // Nilai komitmen terbuka bulan berjalan merupakan nilai komitmen dari bulan berjalan 
+  // ditambahkan komitmen bulan-bulan sebelumnya yang statusnya masih terbuka
   const openCommitmentsCurrentMonth = useMemo(() => {
     return (additionalTransactions || []).filter(t => 
       t.isActive && 
       !hasDocNumber(t) &&
-      (t.month === undefined || t.month === selectedMonth)
+      (t.month === undefined || t.month <= selectedMonth)
     );
   }, [additionalTransactions, selectedMonth]);
 
@@ -274,6 +276,9 @@ export const MatrixView: React.FC = () => {
       ]);
       wsData.push([
         'Rumus 1: Sisa Pagu Bulan Berjalan = Target s.d. Bulan Berjalan - Realisasi s.d. Bulan Berjalan - Prognosa Bulan Berjalan'
+      ]);
+      wsData.push([
+        'Catatan Rumus 1: Prognosa Bulan Berjalan = Komitmen Terbuka Bulan Berjalan + Komitmen Terbuka Bulan-Bulan Sebelumnya'
       ]);
       wsData.push([
         'Rumus 2: Sisa Pagu 1 Tahun = Target 1 Tahun - Realisasi Bulan Berjalan - Prognosa 1 Tahun'
@@ -537,6 +542,11 @@ export const MatrixView: React.FC = () => {
             <Info className="w-4 h-4 text-amber-600 shrink-0 self-start mt-0.5" />
             <div className="space-y-0.5">
               <div>
+                <strong>Prognosa Bulan Berjalan</strong> = 
+                <span className="font-mono font-semibold ml-1">Komitmen Bulan Berjalan</span> + 
+                <span className="font-mono font-semibold ml-1">Komitmen Terbuka Bulan-Bulan Sebelumnya</span>.
+              </div>
+              <div>
                 <strong>Sisa Pagu Bulan Berjalan</strong> = 
                 <span className="font-mono font-semibold ml-1">Target Bulan Berjalan</span> − 
                 <span className="font-mono font-semibold ml-1">Realisasi Bulan Berjalan</span> − 
@@ -581,7 +591,7 @@ export const MatrixView: React.FC = () => {
           <span className="font-bold text-blue-600 text-sm font-mono">{formatRupiahShort(totals.realMTD)}</span>
         </div>
         <div className="bg-white p-3 rounded-xl border border-purple-100 bg-purple-50/20 shadow-sm text-xs">
-          <span className="text-purple-600 block text-[11px] font-semibold" title="Total komitmen/kontrak terbuka bulan berjalan">Prog Bln Berjalan</span>
+          <span className="text-purple-600 block text-[11px] font-semibold" title="Total komitmen terbuka bulan berjalan ditambah komitmen terbuka bulan-bulan sebelumnya">Prog Bln Berjalan</span>
           <span className="font-bold text-purple-700 text-sm font-mono">{formatRupiahShort(totals.prognosaMTD)}</span>
         </div>
         <div className={`p-3 rounded-xl border shadow-sm text-xs ${
@@ -666,7 +676,7 @@ export const MatrixView: React.FC = () => {
                     <th className="py-3 px-3 text-right">Pagu SKKO ({selectedYear})</th>
                     <th className="py-3 px-3 text-right">Target s/d {MONTH_SHORT_NAMES[selectedMonth]}</th>
                     <th className="py-3 px-3 text-right bg-slate-800 text-blue-300">Realisasi s/d {MONTH_SHORT_NAMES[selectedMonth]}</th>
-                    <th className="py-3 px-3 text-right bg-purple-950/80 text-purple-200" title="Komitmen terbuka bulan berjalan yang belum tercatat dokumen SPJ">
+                    <th className="py-3 px-3 text-right bg-purple-950/80 text-purple-200" title="Komitmen terbuka bulan berjalan ditambah komitmen bulan-bulan sebelumnya yang statusnya masih terbuka">
                       Prog Bln Berjalan
                     </th>
                     <th className="py-3 px-3 text-right bg-amber-950/90 text-amber-300 border-x border-slate-800" title="Target s.d. Bulan Berjalan dikurangi Realisasi s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">

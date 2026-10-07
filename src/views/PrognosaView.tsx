@@ -191,8 +191,10 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
     const documentedCommitments = activeTransactions.filter(t => hasDocNumber(t));
 
     // Open commitments specifically for the current running month / period
+    // Nilai komitmen terbuka bulan berjalan merupakan nilai komitmen dari bulan berjalan
+    // ditambahkan komitmen bulan-bulan sebelumnya yang statusnya masih terbuka (belum terbit dokumen/SPJ)
     const openCommitmentsCurrentMonth = openCommitments.filter(t => 
-      t.month === undefined || t.month === selectedMonth
+      t.month === undefined || t.month <= selectedMonth
     );
 
     const totalOpenCommitmentsCurrentMonth = openCommitmentsCurrentMonth.reduce((s, t) => s + (t.amount || 0), 0);
@@ -310,7 +312,12 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
       // 3. Month Filter
       if (filterMonth === 'CURRENT') {
         const itemMonth = t.month !== undefined ? t.month : selectedMonth;
-        if (itemMonth !== selectedMonth) return false;
+        // Komitmen terbuka bulan berjalan mencakup bulan berjalan dan bulan-bulan sebelumnya yang masih terbuka
+        if (!hasDocNumber(t)) {
+          if (itemMonth > selectedMonth) return false;
+        } else {
+          if (itemMonth !== selectedMonth) return false;
+        }
       } else if (filterMonth !== 'ALL') {
         const targetM = Number(filterMonth);
         const itemMonth = t.month !== undefined ? t.month : selectedMonth;
@@ -546,7 +553,8 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
         <div className="space-y-1">
           <span className="font-bold text-blue-950 block">Ketentuan Perhitungan Nilai Prognosa:</span>
           <p className="text-blue-800/90 leading-relaxed">
-            • <strong>Komitmen Terbuka</strong> (belum terbit nomor dokumen) dijumlahkan dengan Realisasi SAP untuk membentuk <strong>Prognosa Periode Berjalan</strong> (s/d {MONTH_NAMES[selectedMonth]}).<br />
+            • <strong>Nilai Komitmen Terbuka Bulan Berjalan</strong> merupakan nilai komitmen dari bulan berjalan ({MONTH_NAMES[selectedMonth]}) <strong>ditambahkan komitmen bulan-bulan sebelumnya yang statusnya masih terbuka</strong> (belum terbit SPJ/Nomor Dokumen).<br />
+            • <strong>Prognosa Periode Berjalan</strong> dihitung dari <strong>Realisasi SAP s/d Bulan Berjalan + Komitmen Terbuka Bulan Berjalan</strong> (s/d {MONTH_NAMES[selectedMonth]}).<br />
             • <strong>Estimasi Sisa Bulan Berjalan</strong> dihitung dari <strong>Target s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan</strong>.<br />
             • <strong>Prognosa Akhir Tahun</strong> dihitung dari <strong>Nilai Realisasi Bulan Berjalan ditambahkan semua nilai kontrak yang belum tercatat dalam 1 tahun</strong>.<br />
             • Komitmen yang <strong>sudah diisi Nomor Dokumen / SPJ</strong> otomatis <strong>dikecualikan dari perhitungan</strong> karena nilainya diasumsikan telah masuk ke dalam Realisasi SAP pembukuan (mencegah double-counting).
@@ -579,12 +587,16 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
         {/* Card 2: Komitmen Terbuka Periode Berjalan */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Komitmen Terbuka ({MONTH_SHORT_NAMES[selectedMonth]})</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider" title="Nilai komitmen bulan berjalan ditambah komitmen bulan-bulan sebelumnya yang statusnya masih terbuka">
+              Komitmen Terbuka (s/d {MONTH_SHORT_NAMES[selectedMonth]})
+            </span>
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
               prognosaSummary.totalOpenCommitmentsCurrentMonth < 0
                 ? 'bg-rose-50 text-rose-700 border-rose-200'
                 : 'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
+            }`}
+            title="Jumlah komitmen aktif yang belum terbit dokumen SPJ s/d cut-off bulan berjalan"
+            >
               {prognosaSummary.openCommitmentsCurrentMonthCount} Item
             </span>
           </div>
@@ -672,7 +684,9 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                 <th className="py-3 px-4 text-right">Pagu 1 Tahun</th>
                 <th className="py-3 px-4 text-right">Target s/d {MONTH_SHORT_NAMES[selectedMonth]}</th>
                 <th className="py-3 px-4 text-right text-blue-300">Real SAP s/d {MONTH_SHORT_NAMES[selectedMonth]}</th>
-                <th className="py-3 px-4 text-right text-amber-300">Komitmen Terbuka ({MONTH_SHORT_NAMES[selectedMonth]})</th>
+                <th className="py-3 px-4 text-right text-amber-300" title="Nilai komitmen bulan berjalan ditambah komitmen bulan-bulan sebelumnya yang statusnya masih terbuka">
+                  Komitmen Terbuka (s/d {MONTH_SHORT_NAMES[selectedMonth]})
+                </th>
                 <th className="py-3 px-4 text-right bg-indigo-950 text-indigo-200 border-x border-indigo-800">
                   Prognosa Periode Berjalan
                 </th>
@@ -875,7 +889,7 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer"
                 >
-                  <option value="CURRENT">Bln Berjalan ({MONTH_NAMES[selectedMonth]})</option>
+                  <option value="CURRENT">s/d Bln Berjalan ({MONTH_NAMES[selectedMonth]})</option>
                   <option value="ALL">Semua Bulan</option>
                   {MONTH_NAMES.map((name, idx) => (
                     <option key={name} value={idx.toString()}>{name}</option>
@@ -1275,7 +1289,11 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                                                 Masuk Prognosa
                                               </span>
                                               <span className="text-[9px] text-amber-700 font-sans mt-0.5 font-medium">
-                                                {isCurrent ? `Bln ${MONTH_SHORT_NAMES[selectedMonth]}` : `Bln ${MONTH_SHORT_NAMES[t.month || 0]}`}
+                                                {isCurrent 
+                                                  ? `Bln ${MONTH_SHORT_NAMES[selectedMonth]}` 
+                                                  : (t.month !== undefined && t.month < selectedMonth)
+                                                  ? `Carry-Over Bln ${MONTH_SHORT_NAMES[t.month]}`
+                                                  : `Bln ${MONTH_SHORT_NAMES[t.month || 0]}`}
                                               </span>
                                             </div>
                                           )}
@@ -1642,7 +1660,11 @@ export const PrognosaView: React.FC<PrognosaViewProps> = ({ onNavigateTab }) => 
                                   Masuk Prognosa
                                 </span>
                                 <span className="text-[9px] text-amber-700 font-sans mt-0.5 font-medium">
-                                  {isCurrent ? `Bln ${MONTH_SHORT_NAMES[selectedMonth]}` : `Bln ${MONTH_SHORT_NAMES[t.month || 0]}`}
+                                  {isCurrent 
+                                    ? `Bln ${MONTH_SHORT_NAMES[selectedMonth]}` 
+                                    : (t.month !== undefined && t.month < selectedMonth)
+                                    ? `Carry-Over Bln ${MONTH_SHORT_NAMES[t.month]}`
+                                    : `Bln ${MONTH_SHORT_NAMES[t.month || 0]}`}
                                 </span>
                               </div>
                             )}
