@@ -1209,10 +1209,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (updated.documentNumber !== undefined) {
         const docNum = (updated.documentNumber || '').trim();
         const statusBeban: StatusBeban = docNum !== '' ? 'Tercatat' : 'Belum Tercatat';
-        const match = id.match(/^komitmen_ad_(.+)_m(\d+)$/);
-        if (match) {
-          const rawPos = match[1].replace(/_/g, ' ');
-          const month = parseInt(match[2], 10);
+        const glMatch = id.match(/^komitmen_ad_(.+)_gl_([0-9A-Za-z]+)_m(\d+)$/);
+        const legacyMatch = id.match(/^komitmen_ad_(.+)_m(\d+)$/);
+
+        if (glMatch || legacyMatch) {
+          const rawPos = glMatch ? glMatch[1].replace(/_/g, ' ') : legacyMatch![1].replace(/_/g, ' ');
+          const targetGl = glMatch ? glMatch[2] : null;
+          const month = parseInt(glMatch ? glMatch[3] : legacyMatch![2], 10);
 
           setAlihDayaContracts(prev => prev.map(c => {
             const cPos = (c.posAnggaran || c.posType || 'Pos 53') as string;
@@ -1224,7 +1227,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               termins: c.termins.map(t => {
                 const tPos = (t.posType || cPos) as string;
                 const tMonth = t.bulanIndex !== undefined ? t.bulanIndex : 0;
-                const matches = (tPos === rawPos || (rawPos === 'Beban Sewa' && tPos === 'Sewa Non AHG')) && tMonth === month;
+                const tGl = (t.glAccount || c.glAccountDefault || '').trim();
+                const glMatches = targetGl ? tGl === targetGl : true;
+                const matches = (tPos === rawPos || (rawPos === 'Beban Sewa' && tPos === 'Sewa Non AHG')) && tMonth === month && glMatches;
                 if (matches) {
                   return {
                     ...t,

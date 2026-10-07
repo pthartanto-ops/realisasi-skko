@@ -73,6 +73,8 @@ export function generateAlihDayaMonthlyCommitments(
 
   interface GroupData {
     pos: PosType;
+    glAccount: string;
+    glAccountName: string;
     month: number;
     openAmount: number;
     documentedAmount: number;
@@ -80,7 +82,6 @@ export function generateAlihDayaMonthlyCommitments(
     openCount: number;
     documentedCount: number;
     totalCount: number;
-    glCounts: Record<string, { count: number; name: string }>;
     contracts: AlihDayaMonthlyContractItem[];
   }
 
@@ -118,13 +119,16 @@ export function generateAlihDayaMonthlyCommitments(
       const isOpen = !isTercatat;
 
       const nominal = Math.max(0, termin.nominalTagihan ?? termin.amount ?? 0);
-      const terminGl = termin.glAccount || contractGl;
-      const terminGlName = termin.glAccountName || contractGlName;
+      const terminGl = (termin.glAccount || contractGl || DEFAULT_ALIH_DAYA_GL[pos]?.code || '6106201700').trim();
+      const terminGlName = (termin.glAccountName || contractGlName || DEFAULT_ALIH_DAYA_GL[pos]?.name || 'Beban Jasa Tenaga Kerja Kontrak Rutin').trim();
 
-      const groupKey = `${pos}_m${monthIndex}`;
+      // Kelompokkan per POS, per KODE AKUN GL, dan per BULAN agar masing-masing kontrak masuk ke Akun GL yang sesuai di kontrak
+      const groupKey = `${pos}_gl_${terminGl}_m${monthIndex}`;
       if (!groups[groupKey]) {
         groups[groupKey] = {
           pos,
+          glAccount: terminGl,
+          glAccountName: terminGlName,
           month: monthIndex,
           openAmount: 0,
           documentedAmount: 0,
@@ -132,7 +136,6 @@ export function generateAlihDayaMonthlyCommitments(
           openCount: 0,
           documentedCount: 0,
           totalCount: 0,
-          glCounts: {},
           contracts: []
         };
       }
@@ -148,11 +151,6 @@ export function generateAlihDayaMonthlyCommitments(
         g.documentedAmount += nominal;
         g.documentedCount += 1;
       }
-
-      if (!g.glCounts[terminGl]) {
-        g.glCounts[terminGl] = { count: 0, name: terminGlName };
-      }
-      g.glCounts[terminGl].count += 1;
 
       g.contracts.push({
         contractId: contract.id,
@@ -173,12 +171,13 @@ export function generateAlihDayaMonthlyCommitments(
 
   const results: AdditionalTransaction[] = [];
 
-  // Urutkan berdasarkan Bulan lalu POS
+  // Urutkan berdasarkan Bulan, lalu POS, lalu Kode GL
   const sortedKeys = Object.keys(groups).sort((a, b) => {
     const ga = groups[a];
     const gb = groups[b];
     if (ga.month !== gb.month) return ga.month - gb.month;
-    return ga.pos.localeCompare(gb.pos);
+    if (ga.pos !== gb.pos) return ga.pos.localeCompare(gb.pos);
+    return ga.glAccount.localeCompare(gb.glAccount);
   });
 
   sortedKeys.forEach(key => {
@@ -188,27 +187,15 @@ export function generateAlihDayaMonthlyCommitments(
     const monthName = MONTH_NAMES[g.month] || `Bulan ${g.month + 1}`;
     const posName = getPosDisplayName(g.pos);
 
-    // Cari GL Account yang paling sering digunakan dalam grup ini
-    let primaryGl = DEFAULT_ALIH_DAYA_GL[g.pos]?.code || '6106201700';
-    let primaryGlName = DEFAULT_ALIH_DAYA_GL[g.pos]?.name || 'Beban Jasa Borong Kontrak Rutin';
-    let maxGlCount = 0;
-    Object.entries(g.glCounts).forEach(([code, data]) => {
-      if (data.count > maxGlCount) {
-        maxGlCount = data.count;
-        primaryGl = code;
-        primaryGlName = data.name;
-      }
-    });
-
     const isFullyClosed = g.openCount === 0;
 
     let noteText = '';
     if (isFullyClosed) {
-      noteText = `Seluruh ${g.totalCount} tagihan Kontrak Rutin telah tercatat di SAP (${formatRupiah(g.documentedAmount)})`;
+      noteText = `Seluruh ${g.totalCount} tagihan Kontrak Rutin [${g.glAccount}] telah tercatat di SAP (${formatRupiah(g.documentedAmount)})`;
     } else if (g.documentedCount > 0) {
-      noteText = `${g.openCount} tagihan open (${formatRupiah(g.openAmount)}), ${g.documentedCount} tagihan tercatat SAP (${formatRupiah(g.documentedAmount)}) dari total ${g.totalCount} tagihan Kontrak Rutin ${g.pos}`;
+      noteText = `${g.openCount} tagihan open (${formatRupiah(g.openAmount)}), ${g.documentedCount} tagihan tercatat SAP (${formatRupiah(g.documentedAmount)}) dari total ${g.totalCount} tagihan [${g.glAccount}] ${g.glAccountName}`;
     } else {
-      noteText = `Total ${g.openCount} tagihan Kontrak Rutin ${g.pos} masih open/belum tercatat (${formatRupiah(g.openAmount)})`;
+      noteText = `Total ${g.openCount} tagihan Kontrak Rutin [${g.glAccount}] ${g.glAccountName} masih open/belum tercatat (${formatRupiah(g.openAmount)})`;
     }
 
     // Nomor Dokumen:
@@ -221,17 +208,19 @@ export function generateAlihDayaMonthlyCommitments(
 
     // Nominal komitmen:
     // Mengikuti sisa tagihan yang masih OPEN.
-    // Bila sudah tidak open, nominal adalah 0 (atau totalAmount dengan flag dokumen tercatat).
     const amount = isFullyClosed ? 0 : g.openAmount;
 
+    // Nama transaksi mencerminkan akun GL dan nama pekerjaan kontrak secara spesifik
+    const transactionName = `Tagihan Kontrak Rutin ${g.pos} - [${g.glAccount}] ${g.glAccountName} (${monthName} ${year})`;
+
     results.push({
-      id: `komitmen_ad_${g.pos.replace(/\s+/g, '_')}_m${g.month}`,
+      id: `komitmen_ad_${g.pos.replace(/\s+/g, '_')}_gl_${g.glAccount}_m${g.month}`,
       posType: g.pos,
       posName,
-      glAccount: primaryGl,
-      glAccountName: primaryGlName,
+      glAccount: g.glAccount,
+      glAccountName: g.glAccountName,
       category: 'PEKERJAAN KONTRAK RUTIN',
-      name: `Tagihan Kontrak Rutin ${g.pos} - ${monthName} ${year}`,
+      name: transactionName,
       month: g.month,
       year,
       amount,
