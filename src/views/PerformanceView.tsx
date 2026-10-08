@@ -32,7 +32,7 @@ import {
   Bar
 } from 'recharts';
 import { useApp } from '../context/AppContext';
-import { IndicatorTarget } from '../types';
+import { IndicatorTarget, AdditionalTransaction } from '../types';
 import { 
   formatRupiah, 
   formatRupiahShort, 
@@ -49,6 +49,7 @@ export const PerformanceView: React.FC = () => {
     updateIndicator, 
     syncSkkoTargetsFromBudget,
     budgetItems,
+    additionalTransactions,
     selectedYear, 
     selectedMonth, 
     setSelectedMonth 
@@ -56,6 +57,22 @@ export const PerformanceView: React.FC = () => {
 
   const [editingIndicator, setEditingIndicator] = useState<IndicatorTarget | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  // Helper check if transaction is documented (already has SPJ)
+  const hasDocNumber = (t: AdditionalTransaction): boolean => {
+    return !!(t.documentNumber && t.documentNumber.trim().length > 0);
+  };
+
+  // Helper match posType of transaction with indicator
+  const matchesPos = (t: AdditionalTransaction, posType: string): boolean => {
+    if (posType === 'Pos 53') return t.posType === 'Pos 53';
+    if (posType === 'Pos 54') return t.posType === 'Pos 54';
+    if (posType === 'Pos 52') return t.posType === 'Pos 52';
+    if (posType === 'Beban Sewa' || posType === 'Sewa Non AHG') {
+      return t.posType === 'Beban Sewa' || (t.posType as string) === 'Sewa Non AHG';
+    }
+    return t.posType === posType;
+  };
 
   const handleManualSync = () => {
     syncSkkoTargetsFromBudget();
@@ -195,23 +212,98 @@ export const PerformanceView: React.FC = () => {
         </div>
       </div>
 
+      {/* Metodologi Chart: Realisasi vs Prognosa */}
+      <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl p-3.5 flex items-center justify-between flex-wrap gap-2 text-xs text-indigo-950 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <Activity className="w-4 h-4 text-indigo-600 shrink-0" />
+          <p className="text-[11px] leading-relaxed">
+            <strong>Metodologi Grafik Capaian:</strong> Untuk periode sebelum bulan berjalan (lampau) grafik menyajikan data <strong>Realisasi Aktual</strong> (garis biru solid). Sedangkan untuk bulan berjalan ({MONTH_NAMES[selectedMonth]}) s.d. akhir periode (Desember) menyajikan data <strong>Prognosa</strong> (Realisasi + Komitmen Terbuka, garis ungu putus-putus).
+          </p>
+        </div>
+        <span className="text-[10px] font-mono bg-white border border-indigo-200 text-indigo-800 px-2.5 py-1 rounded-md font-bold">
+          Cut-Off: {MONTH_SHORT_NAMES[selectedMonth]} {selectedYear}
+        </span>
+      </div>
+
       {/* Main Indicators Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {indicators.map((ind) => {
-          const currentPct = ind.monthlyPercentage[selectedMonth] || 0;
-          const currentReal = ind.monthlyRealization[selectedMonth] || 0;
+          // Open commitments aktif yang belum terbit SPJ untuk pos indikator ini
+          const openCommitments = (additionalTransactions || []).filter(t => 
+            t.isActive && 
+            !hasDocNumber(t) && 
+            matchesPos(t, ind.posType)
+          );
+
+          // Base realization s.d. cut-off bulan berjalan
+          const baseRealCurrentMonth = ind.monthlyRealization[selectedMonth] || 0;
           const currentTarget = ind.monthlyTarget[selectedMonth] || 0;
-          const selisih = currentTarget - currentReal;
 
-          const statusInfo = getPerformanceStatus(currentPct);
+          // Komitmen terbuka s.d. bulan berjalan
+          const openCommitmentCurrentMonth = openCommitments
+            .filter(t => t.month === undefined || t.month <= selectedMonth)
+            .reduce((s, t) => s + (t.amount || 0), 0);
 
-          // Chart data for this indicator
-          const chartData = MONTH_SHORT_NAMES.map((m, idx) => ({
-            month: m,
-            persen: Number((ind.monthlyPercentage[idx] || 0).toFixed(1)),
-            realisasi: ind.monthlyRealization[idx] || 0,
-            target: ind.monthlyTarget[idx] || 0
-          }));
+          // Prognosa bulan berjalan = realisasi s.d. cut-off + komitmen terbuka bulan berjalan
+          const currentPrognosa = baseRealCurrentMonth + openCommitmentCurrentMonth;
+          const currentPrognosaPct = currentTarget > 0 ? (currentPrognosa / currentTarget) * 100 : 0;
+
+          // Realisasi murni s.d. bulan berjalan
+          const currentReal = ind.monthlyRealization[selectedMonth] || 0;
+          const currentRealPct = currentTarget > 0 ? (currentReal / currentTarget) * 100 : 0;
+
+          // Status capaian berdasarkan persentase bulan berjalan (menggunakan prognosa untuk periode berjalan)
+          const statusInfo = getPerformanceStatus(currentPrognosaPct);
+          const selisih = currentTarget - currentPrognosa;
+
+          // Chart data for this indicator:
+          // Periode lampau (idx < selectedMonth) = data REALISASI
+          // Periode berjalan s.d. akhir (idx >= selectedMonth) = data PROGNOSA
+          const chartData = MONTH_SHORT_NAMES.map((m, idx) => {
+            const targetVal = ind.monthlyTarget[idx] || 0;
+            const isPast = idx < selectedMonth;
+            const isCurrent = idx === selectedMonth;
+
+            let nominalVal = 0;
+            let statusLabel = '';
+
+            if (isPast) {
+              // Periode sebelumnya / lampau: Menggunakan data REALISASI
+              nominalVal = ind.monthlyRealization[idx] || 0;
+              statusLabel = 'Realisasi Aktual';
+            } else if (isCurrent) {
+              // Periode berjalan: Menggunakan data PROGNOSA (Realisasi + Komitmen Terbuka)
+              nominalVal = currentPrognosa;
+              statusLabel = 'Prognosa Bln Berjalan';
+            } else {
+              // Periode masa datang s.d. Desember: Menggunakan data PROGNOSA kumulatif
+              const openUpToMonth = openCommitments
+                .filter(t => (t.month === undefined ? idx === 11 : t.month <= idx))
+                .reduce((s, t) => s + (t.amount || 0), 0);
+              nominalVal = Math.max(ind.monthlyRealization[idx] || 0, baseRealCurrentMonth + openUpToMonth);
+              statusLabel = 'Prognosa (Proyeksi)';
+            }
+
+            const persenVal = targetVal > 0 ? (nominalVal / targetVal) * 100 : 0;
+            const roundedPersen = Number(persenVal.toFixed(1));
+            const realPersen = targetVal > 0 ? ((ind.monthlyRealization[idx] || 0) / targetVal) * 100 : 0;
+
+            return {
+              month: m,
+              idx,
+              persen: roundedPersen,
+              // persenRealisasi diplot untuk idx <= selectedMonth agar tersambung mulus di selectedMonth
+              persenRealisasi: idx <= selectedMonth ? (idx < selectedMonth ? Number(realPersen.toFixed(1)) : roundedPersen) : null,
+              // persenPrognosa diplot untuk idx >= selectedMonth
+              persenPrognosa: idx >= selectedMonth ? roundedPersen : null,
+              nominal: nominalVal,
+              realisasiMurni: ind.monthlyRealization[idx] || 0,
+              target: targetVal,
+              isPrognosa: idx >= selectedMonth,
+              isCurrentMonth: isCurrent,
+              statusLabel
+            };
+          });
 
           return (
             <div key={ind.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
@@ -249,11 +341,23 @@ export const PerformanceView: React.FC = () => {
               </div>
 
               {/* Big KPI Numbers */}
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/80 grid grid-cols-3 gap-2 text-center">
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase block">Realisasi s/d Bln</span>
                   <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block">
                     {formatRupiahShort(currentReal)}
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    {formatPercent(currentRealPct)} Target
+                  </span>
+                </div>
+                <div className="bg-purple-50/60 rounded-lg p-1 border border-purple-100">
+                  <span className="text-[10px] font-bold text-purple-700 uppercase block">Prog Bln Berjalan</span>
+                  <span className="text-sm font-black text-purple-900 font-mono mt-0.5 block">
+                    {formatRupiahShort(currentPrognosa)}
+                  </span>
+                  <span className="text-[9px] text-purple-600 font-mono font-semibold">
+                    +{formatRupiahShort(openCommitmentCurrentMonth)} Komitmen
                   </span>
                 </div>
                 <div>
@@ -261,11 +365,17 @@ export const PerformanceView: React.FC = () => {
                   <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block">
                     {formatRupiahShort(currentTarget)}
                   </span>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    Pagu s.d. {MONTH_SHORT_NAMES[selectedMonth]}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase block">Pencapaian (%)</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase block">Pencapaian Prognosa</span>
                   <span className={`text-base font-extrabold mt-0.5 block ${statusInfo.textClass}`}>
-                    {formatPercent(currentPct)}
+                    {formatPercent(currentPrognosaPct)}
+                  </span>
+                  <span className="text-[9px] text-slate-500">
+                    {statusInfo.label}
                   </span>
                 </div>
               </div>
@@ -273,7 +383,7 @@ export const PerformanceView: React.FC = () => {
               {/* Progress bar */}
               <div>
                 <div className="flex justify-between text-xs text-slate-500 mb-1">
-                  <span>Realisasi vs Target SKKO:</span>
+                  <span>Prognosa vs Target SKKO:</span>
                   <span className="font-semibold text-slate-700">
                     {selisih >= 0 ? `Hemat ${formatRupiahShort(selisih)}` : `Over ${formatRupiahShort(Math.abs(selisih))}`}
                   </span>
@@ -281,7 +391,7 @@ export const PerformanceView: React.FC = () => {
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${statusInfo.bgClass}`}
-                    style={{ width: `${Math.min(100, currentPct)}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, currentPrognosaPct))}%` }}
                   />
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
@@ -293,33 +403,89 @@ export const PerformanceView: React.FC = () => {
               </div>
 
               {/* Mini Trend Line Chart */}
-              <div className="h-48 pt-2">
-                <span className="text-[11px] font-semibold text-slate-500 block mb-1">
-                  Tren Pencapaian Indikator Jan - Des (%):
-                </span>
+              <div className="h-56 pt-2">
+                <div className="flex items-center justify-between flex-wrap gap-1 mb-1.5">
+                  <span className="text-[11px] font-bold text-slate-700">
+                    Tren Capaian: Realisasi &amp; Prognosa Jan - Des (%):
+                  </span>
+                  <div className="flex items-center gap-3 text-[10px]">
+                    <span className="flex items-center gap-1.5 text-blue-700 font-semibold" title="Data Realisasi Aktual periode lampau">
+                      <span className="w-2.5 h-1 bg-blue-600 inline-block rounded-full"></span>
+                      Realisasi (Lampau)
+                    </span>
+                    <span className="flex items-center gap-1.5 text-purple-700 font-semibold" title="Data Prognosa untuk periode berjalan s.d. Desember">
+                      <span className="w-2.5 h-0.5 border-t-2 border-purple-600 border-dashed inline-block"></span>
+                      Prognosa (s.d. Des)
+                    </span>
+                  </div>
+                </div>
+
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                     <YAxis domain={[0, 125]} tick={{ fontSize: 10 }} tickFormatter={(v) => `${v}%`} />
                     <Tooltip 
-                      formatter={(val: any) => [`${val}%`, 'Pencapaian']}
-                      contentStyle={{ backgroundColor: '#1e293b', color: '#fff', borderRadius: '8px', fontSize: '11px' }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const d = payload[0]?.payload;
+                        if (!d) return null;
+                        return (
+                          <div className="bg-slate-900 text-white p-2.5 rounded-lg shadow-xl text-[11px] space-y-1.5 border border-slate-700 min-w-[210px]">
+                            <div className="flex items-center justify-between font-bold border-b border-slate-700 pb-1">
+                              <span>Bulan {d.month}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                d.isPrognosa ? 'bg-purple-900/80 text-purple-200 border border-purple-500/50' : 'bg-blue-900/80 text-blue-200 border border-blue-500/50'
+                              }`}>
+                                {d.statusLabel}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-300">
+                              <span>Nilai Beban:</span>
+                              <span className="font-mono font-semibold text-white">{formatRupiah(d.nominal)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-300">
+                              <span>Target SKKO:</span>
+                              <span className="font-mono text-slate-200">{formatRupiah(d.target)}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-1 border-t border-slate-800">
+                              <span className="font-bold text-amber-300">Pencapaian:</span>
+                              <span className="font-mono font-black text-amber-300 text-xs">{formatPercent(d.persen)}</span>
+                            </div>
+                          </div>
+                        );
+                      }}
                     />
                     {/* 100% Overbudget Reference Line */}
-                    <ReferenceLine y={100} stroke="#f43f5e" strokeDasharray="3 3" label={{ value: '100% Overbudget', fill: '#e11d48', fontSize: 9, position: 'insideTopRight' }} />
+                    <ReferenceLine y={100} stroke="#f43f5e" strokeDasharray="3 3" label={{ value: '100% Over', fill: '#e11d48', fontSize: 9, position: 'insideTopRight' }} />
                     {/* 95% Optimal Threshold Line */}
-                    <ReferenceLine y={95} stroke="#10b981" strokeDasharray="2 2" label={{ value: '95% Optimal', fill: '#059669', fontSize: 9, position: 'insideBottomRight' }} />
+                    <ReferenceLine y={95} stroke="#10b981" strokeDasharray="2 2" label={{ value: '95% Opt', fill: '#059669', fontSize: 9, position: 'insideBottomRight' }} />
                     {/* 50% Threshold Line */}
-                    <ReferenceLine y={50} stroke="#f59e0b" strokeDasharray="2 2" label={{ value: '50% Bermasalah', fill: '#d97706', fontSize: 9, position: 'insideBottomLeft' }} />
+                    <ReferenceLine y={50} stroke="#f59e0b" strokeDasharray="2 2" label={{ value: '50% Min', fill: '#d97706', fontSize: 9, position: 'insideBottomLeft' }} />
 
+                    {/* Line 1: Realisasi Aktual (Periode Lampau) */}
                     <Line 
                       type="monotone" 
-                      dataKey="persen" 
-                      stroke="#4f46e5" 
+                      dataKey="persenRealisasi" 
+                      name="Realisasi (Lampau)" 
+                      stroke="#2563eb" 
                       strokeWidth={2.5} 
-                      dot={{ r: 3, fill: '#4f46e5' }} 
+                      dot={{ r: 3, fill: '#2563eb' }} 
                       activeDot={{ r: 5 }} 
+                      isAnimationActive={false}
+                    />
+
+                    {/* Line 2: Prognosa (Bulan Berjalan s.d. Desember) */}
+                    <Line 
+                      type="monotone" 
+                      dataKey="persenPrognosa" 
+                      name="Prognosa (s.d. Des)" 
+                      stroke="#7c3aed" 
+                      strokeWidth={2.5} 
+                      strokeDasharray="4 4" 
+                      dot={{ r: 3.5, fill: '#7c3aed' }} 
+                      activeDot={{ r: 5.5 }} 
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>

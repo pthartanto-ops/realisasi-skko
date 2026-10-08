@@ -231,6 +231,12 @@ export const BudgetInputView: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
+  const handleReconcileAll = () => {
+    reconcileAllBudgetAllocations();
+    setReconcileNotice('Rekonsiliasi Selesai: Akumulasi alokasi 12 bulan seluruh akun anggaran telah diselaraskan agar tepat 100% klop dengan Pagu Tahunan SKKO.');
+    setTimeout(() => setReconcileNotice(null), 6000);
+  };
+
   const handleOpenEdit = (item: BudgetItem) => {
     setEditingItem(JSON.parse(JSON.stringify(item)));
   };
@@ -321,6 +327,15 @@ export const BudgetInputView: React.FC = () => {
           </button>
 
           <button type="button"
+            onClick={handleReconcileAll}
+            className="px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Selaraskan akumulasi 12 bulan seluruh akun agar tepat sama 100% dengan Pagu Tahunan SKKO"
+          >
+            <Scale className="w-4 h-4 text-emerald-600" />
+            <span>Rekonsiliasi Pagu & Alokasi</span>
+          </button>
+
+          <button type="button"
             onClick={handleOpenAdd}
             className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm shadow-blue-500/20 flex items-center gap-1.5 transition-all"
           >
@@ -329,6 +344,18 @@ export const BudgetInputView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {reconcileNotice && (
+        <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-900 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{reconcileNotice}</span>
+          </div>
+          <button type="button" onClick={() => setReconcileNotice(null)} className="text-emerald-700 hover:text-emerald-950 font-bold p-1 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filter and Control Bar */}
       <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
