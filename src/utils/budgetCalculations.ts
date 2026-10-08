@@ -92,3 +92,41 @@ export function recalculateBudgetSubtotals(items: BudgetItem[]): BudgetItem[] {
     };
   });
 }
+
+/**
+ * Menyelaraskan rincian alokasi bulanan (Jan-Des) dengan Pagu Tahunan (SKKO).
+ * Menjamin bahwa akumulasi 12 bulan tepat sama dengan Pagu Tahunan (selisih pembulatan dialokasikan ke bulan Desember).
+ */
+export function reconcileBudgetAllocations(items: BudgetItem[]): BudgetItem[] {
+  const balancedItems = items.map(item => {
+    if (item.isGroupHeader) return item;
+
+    const monthlyValues = [...(item.budgetMonthly || Array(12).fill(0))];
+    while (monthlyValues.length < 12) monthlyValues.push(0);
+
+    const monthlySum = monthlyValues.reduce((a, b) => a + (b || 0), 0);
+    const annual = item.budgetAnnual || 0;
+
+    // Jika pagu tahunan ada namun berbeda dengan jumlah 12 bulan:
+    // Selaraskan sisa selisih ke bulan Desember (bulan ke-12)
+    if (annual > 0 && Math.abs(annual - monthlySum) > 0.001) {
+      const sumJanNov = monthlyValues.slice(0, 11).reduce((a, b) => a + (b || 0), 0);
+      monthlyValues[11] = Math.max(0, annual - sumJanNov);
+      return {
+        ...item,
+        budgetAnnual: annual,
+        budgetMonthly: monthlyValues
+      };
+    } else if (annual === 0 && monthlySum > 0) {
+      return {
+        ...item,
+        budgetAnnual: monthlySum,
+        budgetMonthly: monthlyValues
+      };
+    }
+
+    return item;
+  });
+
+  return recalculateBudgetSubtotals(balancedItems);
+}

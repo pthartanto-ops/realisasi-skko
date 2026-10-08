@@ -15,7 +15,11 @@ import {
   Layers,
   FolderX,
   Eye,
-  EyeOff
+  EyeOff,
+  Scale,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BudgetItem, PosType } from '../types';
@@ -31,12 +35,14 @@ export const BudgetInputView: React.FC = () => {
     deleteSubAccount,
     deleteMultipleBudgetItems,
     resetAllValuesToZero,
+    reconcileAllBudgetAllocations,
     selectedYear 
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPosFilter, setSelectedPosFilter] = useState<string>('ALL');
   const [hideZeroAccounts, setHideZeroAccounts] = useState<boolean>(false);
+  const [reconcileNotice, setReconcileNotice] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
 

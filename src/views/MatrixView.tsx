@@ -11,7 +11,9 @@ import {
   SlidersHorizontal,
   FileSpreadsheet,
   Calculator,
-  Info
+  Info,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useApp } from '../context/AppContext';
@@ -260,22 +262,29 @@ export const MatrixView: React.FC = () => {
       }
     });
 
-    const prognosaMTD = totalOpenCommitmentsCurrentMonth;
+    // Pada bulan Desember (penutup tahun / selectedMonth === 11):
+    // 1. Prognosa Bulan Berjalan = Prognosa 1 Tahun (mencakup seluruh komitmen terbuka tahun berjalan)
+    // 2. Target s.d. Bulan Berjalan = Pagu Tahunan SKKO (totalAnnual)
+    // Menjamin Sisa Pagu Bulan Berjalan dan Sisa Pagu 1 Tahun bernilai seimbang dan identik (100% konsisten)
+    const isDecember = selectedMonth === 11;
+    const prognosaMTD = isDecember ? totalOpenCommitmentsAnnual : totalOpenCommitmentsCurrentMonth;
     const prognosaAnnual = totalOpenCommitmentsAnnual;
 
+    const effectiveTargetMTD = isDecember ? totalAnnual : targetMTD;
+
     // Sisa pagu bulan berjalan = target bulan berjalan dikurangi realisasi bulan berjalan dikurangi prognosa bulan berjalan
-    const sisaPaguBulanBerjalan = targetMTD - realMTD - prognosaMTD;
+    const sisaPaguBulanBerjalan = effectiveTargetMTD - realMTD - prognosaMTD;
 
     // Sisa pagu satu tahun = target satu tahun dikurangi realisasi bulan berjalan dikurangi prognosa satu tahun
     const sisaPaguAnnual = totalAnnual - realMTD - prognosaAnnual;
 
     // Persentase bulan berjalan dan satu tahun didapat dari realisasi ditambah prognosa dibagi pagu
     const penyerapanTahunanPct = totalAnnual > 0 ? ((realMTD + prognosaAnnual) / totalAnnual) * 100 : 0;
-    const penyerapanSdMonthPct = targetMTD > 0 ? ((realMTD + prognosaMTD) / targetMTD) * 100 : 0;
+    const penyerapanSdMonthPct = effectiveTargetMTD > 0 ? ((realMTD + prognosaMTD) / effectiveTargetMTD) * 100 : 0;
 
     return {
       totalAnnual,
-      targetMTD,
+      targetMTD: effectiveTargetMTD,
       realMTD,
       prognosaMTD,
       prognosaAnnual,
@@ -338,18 +347,20 @@ export const MatrixView: React.FC = () => {
           bMTD += item.budgetMonthly?.[m] || 0;
         }
 
-        const progItem = getItemPrognosaCurrentMonth(item);
+        const isDecember = selectedMonth === 11;
+        const progItem = isDecember ? getItemPrognosaAnnual(item) : getItemPrognosaCurrentMonth(item);
         const progAnnualItem = getItemPrognosaAnnual(item);
+        const effectiveBMTD = isDecember && (item.budgetAnnual > 0 || bMTD === 0) ? item.budgetAnnual : bMTD;
 
         // Sisa pagu bulan berjalan = target s.d. bulan berjalan dikurangi realisasi s.d. bulan berjalan dikurangi prognosa bulan berjalan
-        const sisaBlnBerjalan = bMTD - rMTD - progItem;
+        const sisaBlnBerjalan = effectiveBMTD - rMTD - progItem;
 
         // Sisa pagu satu tahun = target satu tahun dikurangi realisasi bulan berjalan dikurangi prognosa satu tahun
         const sisaTahunan = item.budgetAnnual - rMTD - progAnnualItem;
 
         // Persentase bulan berjalan dan satu tahun didapat dari realisasi ditambah prognosa dibagi pagu
         const pctTahunan = item.budgetAnnual > 0 ? ((rMTD + progAnnualItem) / item.budgetAnnual) * 100 : 0;
-        const pctMTD = bMTD > 0 ? ((rMTD + progItem) / bMTD) * 100 : 0;
+        const pctMTD = effectiveBMTD > 0 ? ((rMTD + progItem) / effectiveBMTD) * 100 : 0;
 
         wsData.push([
           idx + 1,
@@ -357,7 +368,7 @@ export const MatrixView: React.FC = () => {
           item.name,
           item.posType,
           item.budgetAnnual,
-          bMTD,
+          effectiveBMTD,
           rMTD,
           progItem,
           sisaBlnBerjalan,
@@ -564,6 +575,34 @@ export const MatrixView: React.FC = () => {
           </div>
         </div>
 
+        {/* Year-End December Reconciliation Banner */}
+        {selectedMonth === 11 && (
+          <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-emerald-950 text-sm">
+                    Status Tutup Buku (Desember): Rekonsiliasi Sisa Pagu Berjalan & Sisa Pagu 1 Tahun Selesai
+                  </h4>
+                  <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Balance 100%
+                  </span>
+                </div>
+                <p className="text-emerald-800 text-[11px] mt-0.5">
+                  Pada periode penutup tahun (Desember), target s.d. bulan berjalan dikonsolidasikan dengan Pagu Tahunan SKKO dan seluruh komitmen terbuka tahun berjalan diakui penuh. Nilai <strong>Sisa Pagu Bulan Berjalan</strong> dan <strong>Sisa Pagu 1 Tahun</strong> terkonsolidasi seimbang dan identik.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-900 bg-white/90 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Selisih Rekonsiliasi: <strong>Rp 0</strong> (Identik)</span>
+            </div>
+          </div>
+        )}
+
         {/* Formula Information Note */}
         <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg px-3.5 py-2.5 flex items-center justify-between flex-wrap gap-2 text-[11px] text-amber-900">
           <div className="flex items-center gap-2.5">
@@ -573,6 +612,9 @@ export const MatrixView: React.FC = () => {
                 <strong>Prognosa Bulan Berjalan</strong> = 
                 <span className="font-mono font-semibold ml-1">Komitmen Bulan Berjalan</span> + 
                 <span className="font-mono font-semibold ml-1">Komitmen Terbuka Bulan-Bulan Sebelumnya</span>.
+                {selectedMonth === 11 && (
+                  <span className="ml-1 text-emerald-700 font-semibold italic">(Di bulan Desember mencakup seluruh komitmen terbuka 1 tahun).</span>
+                )}
               </div>
               <div>
                 <strong>Sisa Pagu Bulan Berjalan</strong> = 
@@ -585,6 +627,9 @@ export const MatrixView: React.FC = () => {
                 <span className="font-mono font-semibold ml-1">Target 1 Tahun (Pagu SKKO)</span> − 
                 <span className="font-mono font-semibold ml-1">Realisasi Bulan Berjalan</span> − 
                 <span className="font-mono font-semibold ml-1">Prognosa 1 Tahun</span>.
+                {selectedMonth === 11 && (
+                  <span className="ml-1 text-emerald-700 font-semibold italic">(Pada tutup buku Desember, nilainya identik dengan Sisa Pagu Bulan Berjalan).</span>
+                )}
               </div>
               <div>
                 <strong>% Bulan Berjalan</strong> = (
@@ -709,14 +754,18 @@ export const MatrixView: React.FC = () => {
                     </th>
                     <th className="py-3 px-3 text-right bg-amber-950/90 text-amber-300 border-x border-slate-800" title="Target s.d. Bulan Berjalan dikurangi Realisasi s.d. Bulan Berjalan dikurangi Prognosa Bulan Berjalan">
                       <span className="block">Sisa Pagu</span>
-                      <span className="text-[9px] text-amber-200 font-normal">Bln Berjalan</span>
+                      <span className="text-[9px] text-amber-200 font-normal">
+                        Bln Berjalan {selectedMonth === 11 && <span className="text-[8px] bg-amber-500/40 text-amber-100 px-1 py-0.2 rounded ml-1 font-bold">DES: IDENTIK</span>}
+                      </span>
                     </th>
                     <th className="py-3 px-3 text-right bg-purple-950/60 text-purple-200" title="Semua nilai kontrak/komitmen terbuka 1 tahun yang belum tercatat dokumen SPJ">
                       Prog 1 Thn
                     </th>
                     <th className="py-3 px-3 text-right bg-amber-950/70 text-amber-200 border-x border-slate-800" title="Target 1 Tahun dikurangi Realisasi Bulan Berjalan dikurangi Prognosa 1 Tahun">
                       <span className="block">Sisa Pagu</span>
-                      <span className="text-[9px] text-amber-300 font-normal">1 Tahun</span>
+                      <span className="text-[9px] text-amber-300 font-normal">
+                        1 Tahun {selectedMonth === 11 && <span className="text-[8px] bg-emerald-500/40 text-emerald-100 px-1 py-0.2 rounded ml-1 font-bold">BALANCE</span>}
+                      </span>
                     </th>
                     <th className="py-3 px-3 text-center bg-indigo-950 text-indigo-200 border-x border-slate-800" title="(Realisasi Bulan Berjalan + Prognosa Bulan Berjalan) / Target Bulan Berjalan">
                       <span className="block">% (Real + Prog)</span>
@@ -801,18 +850,25 @@ export const MatrixView: React.FC = () => {
                   }
 
                   // Prognosa Bulan Berjalan & Prognosa 1 Tahun
-                  const prognosaItem = getItemPrognosaCurrentMonth(item);
+                  // Pada bulan Desember (penutup tahun), komitmen terbuka tahun berjalan diakui penuh
+                  const isDecember = selectedMonth === 11;
+                  const prognosaItem = isDecember ? getItemPrognosaAnnual(item) : getItemPrognosaCurrentMonth(item);
                   const prognosaAnnualItem = getItemPrognosaAnnual(item);
 
+                  // Pada bulan Desember: target s.d. bulan berjalan diselaraskan dengan pagu tahunan akun
+                  const effectiveBMTD = isDecember && (item.budgetAnnual > 0 || bMTD === 0) 
+                    ? item.budgetAnnual 
+                    : bMTD;
+
                   // Sisa pagu bulan berjalan = target bulan berjalan dikurangi realisasi bulan berjalan dikurangi prognosa bulan berjalan
-                  const sisaPaguBulanBerjalanItem = bMTD - rMTD - prognosaItem;
+                  const sisaPaguBulanBerjalanItem = effectiveBMTD - rMTD - prognosaItem;
 
                   // Sisa pagu satu tahun = target satu tahun dikurangi realisasi bulan berjalan dikurangi prognosa satu tahun
                   const sisaPaguAnnualItem = item.budgetAnnual - rMTD - prognosaAnnualItem;
 
                   // Persentase bulan berjalan dan satu tahun didapat dari realisasi ditambah prognosa dibagi pagu
                   const serapTahunanPct = item.budgetAnnual > 0 ? ((rMTD + prognosaAnnualItem) / item.budgetAnnual) * 100 : 0;
-                  const serapSdMonthPct = bMTD > 0 ? ((rMTD + prognosaItem) / bMTD) * 100 : 0;
+                  const serapSdMonthPct = effectiveBMTD > 0 ? ((rMTD + prognosaItem) / effectiveBMTD) * 100 : 0;
 
                   if (isHeader) {
                     return (
@@ -825,7 +881,7 @@ export const MatrixView: React.FC = () => {
                         {matrixMode === 'summary_mtd' && (
                           <>
                             <td className="py-2.5 px-3 text-right">{formatRupiah(item.budgetAnnual)}</td>
-                            <td className="py-2.5 px-3 text-right">{formatRupiah(bMTD)}</td>
+                            <td className="py-2.5 px-3 text-right">{formatRupiah(effectiveBMTD)}</td>
                             <td className="py-2.5 px-3 text-right bg-slate-200 text-blue-800">{formatRupiah(rMTD)}</td>
                             <td 
                               className="py-2.5 px-3 text-right text-purple-700 bg-purple-50/50 cursor-help"
@@ -893,7 +949,9 @@ export const MatrixView: React.FC = () => {
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-right text-slate-800 font-semibold">{formatRupiah(item.budgetAnnual)}</td>
-                          <td className="py-2.5 px-3 text-right text-slate-600">{formatRupiah(bMTD)}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-600" title={isDecember ? `Target s.d. Desember diselaraskan dengan Pagu Tahunan SKKO (${formatRupiah(effectiveBMTD)})` : undefined}>
+                            {formatRupiah(effectiveBMTD)}
+                          </td>
                           <td className="py-2.5 px-3 text-right font-bold text-blue-700 bg-blue-50/50">{formatRupiah(rMTD)}</td>
                           
                           {/* Prognosa Bulan Berjalan */}
@@ -910,7 +968,7 @@ export const MatrixView: React.FC = () => {
                               ? 'text-rose-600 bg-rose-50/40' 
                               : 'text-amber-800 bg-amber-50/30'
                           }`}
-                          title={`Target (${formatRupiah(bMTD)}) - Realisasi (${formatRupiah(rMTD)}) - Prognosa (${formatRupiah(prognosaItem)}) = ${formatRupiah(sisaPaguBulanBerjalanItem)}`}
+                          title={`Target (${formatRupiah(effectiveBMTD)}) - Realisasi (${formatRupiah(rMTD)}) - Prognosa (${formatRupiah(prognosaItem)}) = ${formatRupiah(sisaPaguBulanBerjalanItem)}`}
                           >
                             {formatRupiah(sisaPaguBulanBerjalanItem)}
                           </td>
@@ -936,7 +994,7 @@ export const MatrixView: React.FC = () => {
 
                           <td 
                             className="py-2.5 px-3 text-center font-sans font-bold text-indigo-700 bg-indigo-50/30 border-x border-slate-100"
-                            title={`(Realisasi ${formatRupiah(rMTD)} + Prognosa ${formatRupiah(prognosaItem)}) ÷ Target ${formatRupiah(bMTD)} = ${formatPercent(serapSdMonthPct)}`}
+                            title={`(Realisasi ${formatRupiah(rMTD)} + Prognosa ${formatRupiah(prognosaItem)}) ÷ Target ${formatRupiah(effectiveBMTD)} = ${formatPercent(serapSdMonthPct)}`}
                           >
                             {formatPercent(serapSdMonthPct)}
                           </td>

@@ -16,7 +16,7 @@ import {
 import { DEFAULT_BUDGET_ITEMS, DEFAULT_INDICATORS, DEFAULT_ADDITIONAL_TRANSACTIONS, DEFAULT_ALIH_DAYA_CONTRACTS } from '../data/defaultBudgetData';
 import { generateDefaultYearDataset, YearDataset } from '../data/yearlyBudgetData';
 import { DEFAULT_USERS } from '../data/defaultUsers';
-import { recalculateBudgetSubtotals, getChildAccountsForHeader } from '../utils/budgetCalculations';
+import { recalculateBudgetSubtotals, getChildAccountsForHeader, reconcileBudgetAllocations } from '../utils/budgetCalculations';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { fetchRemoteState, saveRemoteState, AppDataPayload } from '../services/supabaseStorage';
 import { generateAlihDayaMonthlyCommitments } from '../utils/alihDayaCommitmentUtils';
@@ -60,6 +60,7 @@ interface AppContextType {
   resetAllValuesToZero: () => void;
   updateMonthlyBudget: (id: string, monthIndex: number, amount: number) => void;
   distributeAnnualBudget: (id: string, annualAmount: number) => void;
+  reconcileAllBudgetAllocations: () => void;
   
   // Realization operations
   updateRealization: (id: string, monthIndex: number, amount: number) => void;
@@ -1007,6 +1008,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const reconcileAllBudgetAllocations = () => {
+    setBudgetItems(prev => {
+      return reconcileBudgetAllocations(prev);
+    });
+  };
+
   const updateRealization = (id: string, monthIndex: number, amount: number) => {
     setBudgetItems(prev => {
       const next = prev.map(item => {
@@ -1686,6 +1693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetAllValuesToZero,
         updateMonthlyBudget,
         distributeAnnualBudget,
+        reconcileAllBudgetAllocations,
         updateRealization,
         updateAccountRealizationMonthly,
         batchUpdateMonthRealization,
