@@ -217,7 +217,7 @@ export const PerformanceView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <Activity className="w-4 h-4 text-indigo-600 shrink-0" />
           <p className="text-[11px] leading-relaxed">
-            <strong>Metodologi Grafik Capaian:</strong> Untuk periode sebelum bulan berjalan (lampau) grafik menyajikan data <strong>Realisasi Aktual</strong> (garis biru solid). Sedangkan untuk bulan berjalan ({MONTH_NAMES[selectedMonth]}) s.d. akhir periode (Desember) menyajikan data <strong>Prognosa</strong> (Realisasi + Komitmen Terbuka, garis ungu putus-putus).
+            <strong>Metodologi Grafik Capaian:</strong> Untuk periode sebelum bulan berjalan (lampau) grafik menyajikan data <strong>Realisasi Aktual</strong> (garis biru solid). Sedangkan untuk bulan berjalan ({MONTH_NAMES[selectedMonth]}) s.d. akhir periode (Desember) menyajikan data <strong>Prognosa</strong> (Realisasi + Komitmen Terbuka, garis ungu putus-putus). Untuk <strong>persentase pencapaian resmi &amp; status evaluasi</strong> tetap mengacu pada <strong>persentase realisasi periode berjalan</strong>.
           </p>
         </div>
         <span className="text-[10px] font-mono bg-white border border-indigo-200 text-indigo-800 px-2.5 py-1 rounded-md font-bold">
@@ -252,9 +252,11 @@ export const PerformanceView: React.FC = () => {
           const currentReal = ind.monthlyRealization[selectedMonth] || 0;
           const currentRealPct = currentTarget > 0 ? (currentReal / currentTarget) * 100 : 0;
 
-          // Status capaian berdasarkan persentase bulan berjalan (menggunakan prognosa untuk periode berjalan)
-          const statusInfo = getPerformanceStatus(currentPrognosaPct);
-          const selisih = currentTarget - currentPrognosa;
+          // Evaluasi Status Kinerja & Persentase Pencapaian:
+          // Tetap menggunakan persentase realisasi periode berjalan (bukan prognosa)
+          const statusInfo = getPerformanceStatus(currentRealPct);
+          const selisihReal = currentTarget - currentReal;
+          const selisihPrognosa = currentTarget - currentPrognosa;
 
           // Chart data for this indicator:
           // Periode lampau (idx < selectedMonth) = data REALISASI
@@ -281,23 +283,28 @@ export const PerformanceView: React.FC = () => {
                 .filter(t => (t.month === undefined ? idx === 11 : t.month <= idx))
                 .reduce((s, t) => s + (t.amount || 0), 0);
               nominalVal = Math.max(ind.monthlyRealization[idx] || 0, baseRealCurrentMonth + openUpToMonth);
-              statusLabel = 'Prognosa (Proyeksi)';
+              statusLabel = 'Prognosa (s.d. Des)';
             }
 
             const persenVal = targetVal > 0 ? (nominalVal / targetVal) * 100 : 0;
             const roundedPersen = Number(persenVal.toFixed(1));
             const realPersen = targetVal > 0 ? ((ind.monthlyRealization[idx] || 0) / targetVal) * 100 : 0;
+            const roundedReal = Number(realPersen.toFixed(1));
 
             return {
               month: m,
               idx,
               persen: roundedPersen,
-              // persenRealisasi diplot untuk idx <= selectedMonth agar tersambung mulus di selectedMonth
-              persenRealisasi: idx <= selectedMonth ? (idx < selectedMonth ? Number(realPersen.toFixed(1)) : roundedPersen) : null,
-              // persenPrognosa diplot untuk idx >= selectedMonth
-              persenPrognosa: idx >= selectedMonth ? roundedPersen : null,
+              // persenRealisasi diplot hanya untuk periode lampau (idx < selectedMonth)
+              persenRealisasi: isPast ? roundedReal : null,
+              // persenPrognosa diplot untuk periode berjalan s.d. Desember (idx >= selectedMonth)
+              // Disambungkan mulus dari bulan lampau terakhir (selectedMonth - 1)
+              persenPrognosa: !isPast 
+                ? roundedPersen 
+                : (idx === selectedMonth - 1 ? roundedReal : null),
               nominal: nominalVal,
               realisasiMurni: ind.monthlyRealization[idx] || 0,
+              realisasiPersen: roundedReal,
               target: targetVal,
               isPrognosa: idx >= selectedMonth,
               isCurrentMonth: isCurrent,
@@ -330,6 +337,7 @@ export const PerformanceView: React.FC = () => {
                     <Edit3 className="w-4 h-4" />
                   </button>
 
+                  {/* Status Capaian Resmi mengacu pada Persentase Realisasi Periode Berjalan */}
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 border ${statusInfo.badgeClass}`}>
                     {statusInfo.status === 'optimal' && <CheckCircle2 className="w-3.5 h-3.5" />}
                     {statusInfo.status === 'overbudget' && <AlertCircle className="w-3.5 h-3.5" />}
@@ -348,7 +356,7 @@ export const PerformanceView: React.FC = () => {
                     {formatRupiahShort(currentReal)}
                   </span>
                   <span className="text-[9px] text-slate-400 font-mono">
-                    {formatPercent(currentRealPct)} Target
+                    s.d. {MONTH_SHORT_NAMES[selectedMonth]}
                   </span>
                 </div>
                 <div className="bg-purple-50/60 rounded-lg p-1 border border-purple-100">
@@ -370,28 +378,28 @@ export const PerformanceView: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase block">Pencapaian Prognosa</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase block">% Pencapaian Realisasi</span>
                   <span className={`text-base font-extrabold mt-0.5 block ${statusInfo.textClass}`}>
-                    {formatPercent(currentPrognosaPct)}
+                    {formatPercent(currentRealPct)}
                   </span>
-                  <span className="text-[9px] text-slate-500">
+                  <span className="text-[9px] text-slate-500 font-medium">
                     {statusInfo.label}
                   </span>
                 </div>
               </div>
 
-              {/* Progress bar */}
+              {/* Progress bar Realisasi Periode Berjalan */}
               <div>
                 <div className="flex justify-between text-xs text-slate-500 mb-1">
-                  <span>Prognosa vs Target SKKO:</span>
+                  <span>Realisasi vs Target SKKO:</span>
                   <span className="font-semibold text-slate-700">
-                    {selisih >= 0 ? `Hemat ${formatRupiahShort(selisih)}` : `Over ${formatRupiahShort(Math.abs(selisih))}`}
+                    {selisihReal >= 0 ? `Sisa Pagu ${formatRupiahShort(selisihReal)}` : `Over ${formatRupiahShort(Math.abs(selisihReal))}`}
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${statusInfo.bgClass}`}
-                    style={{ width: `${Math.min(100, Math.max(0, currentPrognosaPct))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, currentRealPct))}%` }}
                   />
                 </div>
                 <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
@@ -406,7 +414,7 @@ export const PerformanceView: React.FC = () => {
               <div className="h-56 pt-2">
                 <div className="flex items-center justify-between flex-wrap gap-1 mb-1.5">
                   <span className="text-[11px] font-bold text-slate-700">
-                    Tren Capaian: Realisasi &amp; Prognosa Jan - Des (%):
+                    Tren Capaian: Realisasi Lampau &amp; Prognosa Berjalan s.d. Des (%):
                   </span>
                   <div className="flex items-center gap-3 text-[10px]">
                     <span className="flex items-center gap-1.5 text-blue-700 font-semibold" title="Data Realisasi Aktual periode lampau">
@@ -415,7 +423,7 @@ export const PerformanceView: React.FC = () => {
                     </span>
                     <span className="flex items-center gap-1.5 text-purple-700 font-semibold" title="Data Prognosa untuk periode berjalan s.d. Desember">
                       <span className="w-2.5 h-0.5 border-t-2 border-purple-600 border-dashed inline-block"></span>
-                      Prognosa (s.d. Des)
+                      Prognosa (Bln Berjalan s.d. Des)
                     </span>
                   </div>
                 </div>
@@ -431,7 +439,7 @@ export const PerformanceView: React.FC = () => {
                         const d = payload[0]?.payload;
                         if (!d) return null;
                         return (
-                          <div className="bg-slate-900 text-white p-2.5 rounded-lg shadow-xl text-[11px] space-y-1.5 border border-slate-700 min-w-[210px]">
+                          <div className="bg-slate-900 text-white p-2.5 rounded-lg shadow-xl text-[11px] space-y-1.5 border border-slate-700 min-w-[220px]">
                             <div className="flex items-center justify-between font-bold border-b border-slate-700 pb-1">
                               <span>Bulan {d.month}</span>
                               <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
@@ -441,20 +449,39 @@ export const PerformanceView: React.FC = () => {
                               </span>
                             </div>
                             <div className="flex justify-between items-center text-slate-300">
-                              <span>Nilai Beban:</span>
+                              <span>{d.isPrognosa ? 'Nilai Prognosa:' : 'Realisasi Aktual:'}</span>
                               <span className="font-mono font-semibold text-white">{formatRupiah(d.nominal)}</span>
                             </div>
+                            {d.isCurrentMonth && (
+                              <div className="text-[10px] text-slate-400 pl-1 border-l-2 border-purple-500 space-y-0.5">
+                                <div>• Realisasi: {formatRupiahShort(currentReal)}</div>
+                                <div>• Komitmen Terbuka: {formatRupiahShort(openCommitmentCurrentMonth)}</div>
+                              </div>
+                            )}
                             <div className="flex justify-between items-center text-slate-300">
                               <span>Target SKKO:</span>
                               <span className="font-mono text-slate-200">{formatRupiah(d.target)}</span>
                             </div>
                             <div className="flex justify-between items-center pt-1 border-t border-slate-800">
-                              <span className="font-bold text-amber-300">Pencapaian:</span>
+                              <span className="font-bold text-amber-300">Capaian di Grafik:</span>
                               <span className="font-mono font-black text-amber-300 text-xs">{formatPercent(d.persen)}</span>
                             </div>
+                            {d.isCurrentMonth && (
+                              <div className="flex justify-between items-center pt-0.5 text-[10px] text-emerald-400 font-semibold border-t border-slate-800/80">
+                                <span>Pencapaian Realisasi:</span>
+                                <span className="font-mono">{formatPercent(currentRealPct)}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       }}
+                    />
+                    {/* Vertical line at current cutoff month */}
+                    <ReferenceLine 
+                      x={MONTH_SHORT_NAMES[selectedMonth]} 
+                      stroke="#6366f1" 
+                      strokeDasharray="2 2" 
+                      label={{ value: 'Bln Berjalan', fill: '#6366f1', fontSize: 9, position: 'top' }} 
                     />
                     {/* 100% Overbudget Reference Line */}
                     <ReferenceLine y={100} stroke="#f43f5e" strokeDasharray="3 3" label={{ value: '100% Over', fill: '#e11d48', fontSize: 9, position: 'insideTopRight' }} />

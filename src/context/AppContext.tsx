@@ -106,6 +106,7 @@ const STORAGE_KEY_LOGS = 'madiun_anggaran_logs_v7';
 const STORAGE_KEY_USERS = 'madiun_anggaran_users_v1';
 const STORAGE_KEY_CURRENT_USER = 'madiun_anggaran_current_user_v1';
 const STORAGE_KEY_SELECTED_YEAR = 'madiun_anggaran_selected_year_v1';
+const STORAGE_KEY_SELECTED_MONTH = 'madiun_anggaran_selected_month_v1';
 
 export const AVAILABLE_YEARS = [2024, 2025, 2026, 2027];
 
@@ -477,7 +478,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [alihDayaContracts, setAlihDayaContracts] = useState<AlihDayaContract[]>(initialData.alihDayaContracts);
   const [importLogs, setImportLogs] = useState<ImportLog[]>(initialData.importLogs);
-  const [selectedMonth, setSelectedMonth] = useState<number>(initialYear < 2026 ? 11 : 7);
+  const [selectedMonth, setSelectedMonthState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SELECTED_MONTH);
+      if (saved !== null && !isNaN(Number(saved))) {
+        const m = Number(saved);
+        if (m >= 0 && m <= 11) return m;
+      }
+    } catch {}
+    return initialYear < 2026 ? 11 : 7;
+  });
+
+  const setSelectedMonth = useCallback((month: number) => {
+    setSelectedMonthState(month);
+    try {
+      localStorage.setItem(STORAGE_KEY_SELECTED_MONTH, String(month));
+    } catch {}
+  }, []);
 
   // Menghasilkan komitmen bulanan otomatis dari Kontrak & Termin Alih Daya
   // Mengikuti data alih daya: yang open masuk komitmen bulanan per pos,
@@ -533,7 +550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (targetYear === 2026) {
       setSelectedMonth(7);
     }
-  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs]);
+  }, [budgetItems, indicators, additionalTransactions, alihDayaContracts, importLogs, setSelectedMonth]);
 
   // Users & Current Active User
   const [users, setUsers] = useState<AppUser[]>(() => {

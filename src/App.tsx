@@ -16,8 +16,24 @@ import { LoginView } from './views/LoginView';
 import { ActiveTab, ROLE_PERMISSIONS } from './types';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
+const STORAGE_KEY_ACTIVE_TAB = 'madiun_anggaran_active_tab_v1';
+
 function MainApp() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTabState] = useState<ActiveTab>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) as ActiveTab | null;
+      if (saved) return saved;
+    } catch {}
+    return 'dashboard';
+  });
+
+  const setActiveTab = (tab: ActiveTab) => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, tab);
+    } catch {}
+  };
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('pln_sidebar_collapsed') === 'true';

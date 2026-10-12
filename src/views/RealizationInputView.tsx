@@ -70,12 +70,47 @@ export const RealizationInputView: React.FC = () => {
   const [hideZeroAccounts, setHideZeroAccounts] = useState<boolean>(true);
   
   // In-progress local drafts for monthly focus mode: { [itemId]: string }
-  const [draftInputs, setDraftInputs] = useState<Record<string, string>>({});
+  const [draftInputs, setDraftInputs] = useState<Record<string, string>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`madiun_draft_real_${selectedMonth}`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
-  // Clear uncommitted drafts when active/cut-off month changes
+  // Simpan draftInputs ke sessionStorage agar tidak hilang saat browser di-refresh
   useEffect(() => {
-    setDraftInputs({});
+    try {
+      if (Object.keys(draftInputs).length > 0) {
+        sessionStorage.setItem(`madiun_draft_real_${selectedMonth}`, JSON.stringify(draftInputs));
+      } else {
+        sessionStorage.removeItem(`madiun_draft_real_${selectedMonth}`);
+      }
+    } catch {}
+  }, [draftInputs, selectedMonth]);
+
+  // Peringatkan pengguna jika ada draft belum disimpan saat me-refresh browser
+  useEffect(() => {
+    const hasUnsaved = Object.keys(draftInputs).length > 0;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = 'Terdapat data inputan realisasi yang belum disimpan.';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [draftInputs]);
+
+  // Muat draft bulan yang baru ketika active/cut-off month berganti
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(`madiun_draft_real_${selectedMonth}`);
+      setDraftInputs(saved ? JSON.parse(saved) : {});
+    } catch {
+      setDraftInputs({});
+    }
   }, [selectedMonth]);
 
   // Single Entry Form state
@@ -219,6 +254,13 @@ export const RealizationInputView: React.FC = () => {
     setDraftInputs(prev => {
       const next = { ...prev };
       delete next[itemId];
+      try {
+        if (Object.keys(next).length > 0) {
+          sessionStorage.setItem(`madiun_draft_real_${focusMonth}`, JSON.stringify(next));
+        } else {
+          sessionStorage.removeItem(`madiun_draft_real_${focusMonth}`);
+        }
+      } catch {}
       return next;
     });
 
@@ -236,6 +278,9 @@ export const RealizationInputView: React.FC = () => {
     if (Object.keys(updates).length > 0) {
       batchUpdateMonthRealization(focusMonth, updates);
       setDraftInputs({});
+      try {
+        sessionStorage.removeItem(`madiun_draft_real_${focusMonth}`);
+      } catch {}
     }
 
     setSaveFeedback(`Seluruh perubahan realisasi bulan ${MONTH_NAMES[focusMonth]} berhasil disimpan`);
