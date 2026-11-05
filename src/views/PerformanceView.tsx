@@ -282,7 +282,7 @@ export const PerformanceView: React.FC = () => {
               const openUpToMonth = openCommitments
                 .filter(t => (t.month === undefined ? idx === 11 : t.month <= idx))
                 .reduce((s, t) => s + (t.amount || 0), 0);
-              nominalVal = Math.max(ind.monthlyRealization[idx] || 0, baseRealCurrentMonth + openUpToMonth);
+              nominalVal = baseRealCurrentMonth + openUpToMonth;
               statusLabel = 'Prognosa (s.d. Des)';
             }
 

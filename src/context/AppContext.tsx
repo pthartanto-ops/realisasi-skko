@@ -20,6 +20,7 @@ import { recalculateBudgetSubtotals, getChildAccountsForHeader, reconcileBudgetA
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { fetchRemoteState, saveRemoteState, AppDataPayload } from '../services/supabaseStorage';
 import { generateAlihDayaMonthlyCommitments } from '../utils/alihDayaCommitmentUtils';
+import { parseNumberString } from '../utils/formatters';
 
 interface AppContextType {
   budgetItems: BudgetItem[];
@@ -223,7 +224,10 @@ const normalizeContract = (c: AlihDayaContract): AlihDayaContract => {
     statusKontrak: c.statusKontrak || 'Aktif',
     termins: (c.termins || []).map((t, idx) => {
       const terminLabel = t.terminTagihan || t.termin || `Termin ${idx + 1}`;
-      const nominal = t.nominalTagihan ?? t.amount ?? 0;
+      const rawNominal = t.nominalTagihan !== undefined ? t.nominalTagihan : (t.amount !== undefined ? t.amount : 0);
+      const nominal = typeof rawNominal === 'number'
+        ? (isNaN(rawNominal) ? 0 : rawNominal)
+        : parseNumberString(rawNominal);
       const docNum = t.documentNumber || '';
       const statusBeban: StatusBeban = (docNum.trim() !== '' || t.statusBeban === 'Tercatat') ? 'Tercatat' : 'Belum Tercatat';
       const tgl = t.tanggalJatuhTempo || t.tglTagihan || '';

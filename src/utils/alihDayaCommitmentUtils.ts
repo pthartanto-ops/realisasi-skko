@@ -1,5 +1,5 @@
 import { AlihDayaContract, AdditionalTransaction, PosType, AlihDayaMonthlyContractItem } from '../types';
-import { MONTH_NAMES, formatRupiah } from './formatters';
+import { MONTH_NAMES, formatRupiah, parseNumberString } from './formatters';
 
 // Map default GL Account & Name per Pos
 export const DEFAULT_ALIH_DAYA_GL: Record<string, { code: string; name: string }> = {
@@ -118,7 +118,10 @@ export function generateAlihDayaMonthlyCommitments(
       const isTercatat = hasDoc || termin.statusBeban === 'Tercatat';
       const isOpen = !isTercatat;
 
-      const nominal = Math.max(0, termin.nominalTagihan ?? termin.amount ?? 0);
+      const rawNominal = termin.nominalTagihan ?? termin.amount ?? 0;
+      const nominal = typeof rawNominal === 'number'
+        ? (isNaN(rawNominal) ? 0 : rawNominal)
+        : parseNumberString(rawNominal);
       const terminGl = (termin.glAccount || contractGl || DEFAULT_ALIH_DAYA_GL[pos]?.code || '6106201700').trim();
       const terminGlName = (termin.glAccountName || contractGlName || DEFAULT_ALIH_DAYA_GL[pos]?.name || 'Beban Jasa Tenaga Kerja Kontrak Rutin').trim();
 

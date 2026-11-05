@@ -453,13 +453,26 @@ export const MonthBillsModal: React.FC<MonthBillsModalProps> = ({
                         </label>
                         <input
                           type="number"
+                          step="any"
                           required
                           value={bill.nominalTagihan ?? bill.amount ?? 0}
-                          onChange={(e) => handleBillChange(bIdx, 'nominalTagihan', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || val === '-') {
+                              handleBillChange(bIdx, 'nominalTagihan', 0);
+                            } else {
+                              const parsed = parseFloat(val);
+                              handleBillChange(bIdx, 'nominalTagihan', isNaN(parsed) ? 0 : parsed);
+                            }
+                          }}
                           placeholder="0"
-                          className="w-full px-3 py-1.5 text-xs font-mono font-bold border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+                          className={`w-full px-3 py-1.5 text-xs font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 ${
+                            (bill.nominalTagihan ?? bill.amount ?? 0) < 0 
+                              ? 'text-rose-700 bg-rose-50 border-rose-300 focus:ring-rose-400' 
+                              : 'text-slate-900 border-slate-300 focus:ring-blue-500'
+                          }`}
                         />
-                        <div className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                        <div className={`text-[10px] mt-0.5 font-mono ${(bill.nominalTagihan ?? bill.amount ?? 0) < 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'}`}>
                           = {formatRupiah(bill.nominalTagihan ?? bill.amount ?? 0)}
                         </div>
                       </div>

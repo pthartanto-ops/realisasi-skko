@@ -2681,15 +2681,29 @@ export const AlihDayaMonitoringView: React.FC = () => {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">Rp</span>
                   <input
                     type="number"
+                    step="any"
                     required
-                    value={formTerminNominal || ''}
-                    onChange={(e) => setFormTerminNominal(parseFloat(e.target.value) || 0)}
+                    value={formTerminNominal === 0 ? 0 : formTerminNominal}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || val === '-') {
+                        setFormTerminNominal(0);
+                      } else {
+                        const parsed = parseFloat(val);
+                        setFormTerminNominal(isNaN(parsed) ? 0 : parsed);
+                      }
+                    }}
                     placeholder="0"
-                    className="w-full pl-10 pr-3 py-2 text-xs font-mono font-bold border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full pl-10 pr-3 py-2 text-xs font-mono font-bold border rounded-lg focus:outline-none focus:ring-2 ${
+                      formTerminNominal < 0 
+                        ? 'text-rose-700 bg-rose-50 border-rose-300 focus:ring-rose-400' 
+                        : 'text-slate-900 border-slate-300 focus:ring-blue-500'
+                    }`}
                   />
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1 font-mono">
-                  Terformat: <strong>{formatRupiah(formTerminNominal)}</strong>
+                <div className="text-[11px] text-slate-500 mt-1 font-mono flex items-center justify-between">
+                  <span>Terformat: <strong className={formTerminNominal < 0 ? 'text-rose-600' : 'text-slate-900'}>{formatRupiah(formTerminNominal)}</strong></span>
+                  <span className="text-[10px] text-slate-400">(Dapat diisi nilai minus/negatif)</span>
                 </div>
               </div>
 
